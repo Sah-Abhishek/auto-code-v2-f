@@ -1,0 +1,432 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Search, Filter, Clock, RefreshCw, ChevronDown, ChevronLeft, ChevronRight,
+  FileText, CheckCircle2, Loader2, AlertTriangle, Eye, Bell, X
+} from 'lucide-react';
+
+const API_BASE_URL = 'http://localhost:4000/api';
+
+const ChartWorkQueue = () => {
+  const [charts, setCharts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, pages: 0 });
+  const [stats, setStats] = useState(null);
+
+  // Filters
+  const [filters, setFilters] = useState({
+    facility: '',
+    specialty: '',
+    reviewStatus: '',
+    search: ''
+  });
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Filter options
+  const [facilities, setFacilities] = useState([]);
+  const [specialties, setSpecialties] = useState([]);
+
+  const reviewStatusOptions = [
+    { value: '', label: 'All Statuses' },
+    { value: 'pending', label: 'Pending' },
+    { value: 'in_review', label: 'In Review' },
+    { value: 'submitted', label: 'Submitted' },
+    { value: 'rejected', label: 'Rejected' }
+  ];
+
+  // Fetch charts
+  const fetchCharts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: pagination.page,
+        limit: pagination.limit,
+        ...(filters.facility && { facility: filters.facility }),
+        ...(filters.specialty && { specialty: filters.specialty }),
+        ...(filters.reviewStatus && { reviewStatus: filters.reviewStatus }),
+        ...(filters.search && { search: filters.search })
+      });
+
+      const response = await fetch(`${API_BASE_URL}/charts?${params}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setCharts(data.charts);
+        setPagination(prev => ({ ...prev, ...data.pagination }));
+      }
+    } catch (error) {
+      console.error('Error fetching charts:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [pagination.page, pagination.limit, filters]);
+
+  // Fetch SLA stats
+  const fetchStats = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/charts/stats/sla`);
+      const data = await response.json();
+      if (data.success) {
+        setStats(data.stats);
+      }
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    }
+  };
+
+  // Fetch filter options
+  const fetchFilterOptions = async () => {
+    try {
+      const [facilitiesRes, specialtiesRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/charts/filters/facilities`),
+        fetch(`${API_BASE_URL}/charts/filters/specialties`)
+      ]);
+
+      const facilitiesData = await facilitiesRes.json();
+      const specialtiesData = await specialtiesRes.json();
+
+      if (facilitiesData.success) setFacilities(facilitiesData.facilities);
+      if (specialtiesData.success) setSpecialties(specialtiesData.specialties);
+    } catch (error) {
+      console.error('Error fetching filter options:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchCharts();
+    fetchStats();
+    fetchFilterOptions();
+  }, [fetchCharts]);
+
+  // Refresh data
+  const handleRefresh = () => {
+    fetchCharts();
+    fetchStats();
+  };
+
+  // Handle filter change
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
+  // Get AI status badge
+  const getAIStatusBadge = (status) => {
+    const config = {
+      queued: { bg: 'bg-gray-100', text: 'text-gray-600', icon: Clock, label: 'Queued' },
+      processing: { bg: 'bg-blue-50', text: 'text-blue-600', icon: Loader2, label: 'Processing', animate: true },
+      ready: { bg: 'bg-emerald-50', text: 'text-emerald-600', icon: CheckCircle2, label: 'Ready' },
+      failed: { bg: 'bg-red-50', text: 'text-red-600', icon: AlertTriangle, label: 'Failed' }
+    };
+
+    const { bg, text, icon: Icon, label, animate } = config[status] || config.queued;
+
+    return (
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${bg} ${text}`}>
+        <Icon className={`w-3.5 h-3.5 ${animate ? 'animate-spin' : ''}`} />
+        {label}
+      </span>
+    );
+  };
+
+  // Get review status badge
+  const getReviewStatusBadge = (status) => {
+    const config = {
+      pending: { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200', label: 'Pending' },
+      in_review: { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200', label: 'In Review' },
+      submitted: { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200', label: 'Submitted' },
+      rejected: { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200', label: 'Rejected' }
+    };
+
+    const { bg, text, border, label } = config[status] || config.pending;
+
+    return (
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${bg} ${text} border ${border}`}>
+        {label}
+      </span>
+    );
+  };
+
+  // Get SLA badge
+  const getSLABadge = (sla) => {
+    if (!sla) return <span className="text-sm text-gray-400">--</span>;
+
+    if (sla.isCritical) {
+      return (
+        <span className="inline-flex items-center gap-1 text-red-600 text-sm font-medium">
+          <AlertTriangle className="w-4 h-4" />
+          {sla.hours}h
+        </span>
+      );
+    }
+
+    if (sla.isWarning) {
+      return (
+        <span className="inline-flex items-center gap-1 text-amber-600 text-sm font-medium">
+          <AlertTriangle className="w-4 h-4" />
+          {sla.hours}h
+        </span>
+      );
+    }
+
+    return (
+      <span className="inline-flex items-center gap-1 text-emerald-600 text-sm font-medium">
+        <CheckCircle2 className="w-4 h-4" />
+        {sla.hours}h
+      </span>
+    );
+  };
+
+  // Format date
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: '2-digit',
+      day: '2-digit',
+      year: 'numeric'
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-blue-50/30 p-6 lg:p-8 font-['Inter',system-ui,sans-serif]">
+      <div className="max-w-7xl mx-auto space-y-6">
+
+        {/* Header */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-semibold text-slate-900">Chart Work Queue</h1>
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-lg border border-blue-200">
+              <span className="text-xs text-blue-600">AI = First Coder | Human = Auditor (Paired)</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Facility Filter */}
+            <div className="relative">
+              <select
+                value={filters.facility}
+                onChange={(e) => handleFilterChange('facility', e.target.value)}
+                className="appearance-none bg-white border border-slate-300 rounded-lg px-4 py-2 pr-10 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+              >
+                <option value="">All Facilities</option>
+                {facilities.map(f => <option key={f} value={f}>{f}</option>)}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* Specialty Filter */}
+            <div className="relative">
+              <select
+                value={filters.specialty}
+                onChange={(e) => handleFilterChange('specialty', e.target.value)}
+                className="appearance-none bg-white border border-slate-300 rounded-lg px-4 py-2 pr-10 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+              >
+                <option value="">All Specialties</option>
+                {specialties.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* Review Status Filter */}
+            <div className="relative">
+              <select
+                value={filters.reviewStatus}
+                onChange={(e) => handleFilterChange('reviewStatus', e.target.value)}
+                className="appearance-none bg-white border border-slate-300 rounded-lg px-4 py-2 pr-10 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+              >
+                {reviewStatusOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* Notification Bell */}
+            <button className="relative p-2 text-slate-500 hover:bg-slate-100 rounded-lg">
+              <Bell className="w-5 h-5" />
+              {stats?.slaCritical > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center">
+                  {stats.slaCritical}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Search and Actions Bar */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            {/* Search */}
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search by MRN or Chart Number..."
+                value={filters.search}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+              >
+                <Filter className="w-4 h-4" />
+                Advanced Filters
+              </button>
+
+              <button className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">
+                <Clock className="w-4 h-4" />
+                SLA View
+              </button>
+
+              {/* Stats */}
+              <div className="hidden lg:flex items-center gap-4 px-4 py-2 bg-slate-50 rounded-lg">
+                <span className="text-sm text-slate-600">
+                  Queue: <span className="font-semibold text-slate-900">{stats?.total || 0}</span> charts
+                </span>
+                <span className="text-sm text-amber-600">
+                  SLA Warning: <span className="font-semibold">{stats?.slaWarning || 0}</span>
+                </span>
+                <span className="text-sm text-red-600">
+                  SLA Critical: <span className="font-semibold">{stats?.slaCritical || 0}</span>
+                </span>
+              </div>
+
+              <button
+                onClick={handleRefresh}
+                disabled={loading}
+                className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">MRN</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Chart Number</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Facility</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Date of Service</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Specialty</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Documents</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">AI Status</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Review Status</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">SLA</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {loading ? (
+                  <tr>
+                    <td colSpan={10} className="px-6 py-12 text-center">
+                      <Loader2 className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-2" />
+                      <p className="text-slate-500">Loading charts...</p>
+                    </td>
+                  </tr>
+                ) : charts.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="px-6 py-12 text-center">
+                      <FileText className="w-12 h-12 text-slate-300 mx-auto mb-2" />
+                      <p className="text-slate-500">No charts found</p>
+                    </td>
+                  </tr>
+                ) : (
+                  charts.map((chart) => (
+                    <tr key={chart.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-6 py-4">
+                        <span className="text-sm font-semibold text-slate-900">{chart.mrn || 'N/A'}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm text-slate-600">{chart.chartNumber}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm text-slate-600">{chart.facility || 'N/A'}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm text-slate-600">{formatDate(chart.dateOfService)}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm text-slate-600">{chart.specialty || 'N/A'}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center gap-1.5 text-sm text-slate-600">
+                          <FileText className="w-4 h-4" />
+                          {chart.documentCount || 0} {chart.documentCount === 1 ? 'doc' : 'docs'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {getAIStatusBadge(chart.aiStatus)}
+                      </td>
+                      <td className="px-6 py-4">
+                        {getReviewStatusBadge(chart.reviewStatus)}
+                      </td>
+                      <td className="px-6 py-4">
+                        {getSLABadge(chart.sla)}
+                      </td>
+                      <td className="px-6 py-4">
+                        {chart.aiStatus === 'ready' ? (
+                          <button className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
+                            Open Chart
+                          </button>
+                        ) : chart.aiStatus === 'processing' ? (
+                          <button disabled className="px-4 py-2 text-sm font-medium text-slate-400 bg-slate-100 rounded-lg cursor-not-allowed">
+                            Open Chart
+                          </button>
+                        ) : chart.reviewStatus === 'submitted' ? (
+                          <button className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
+                            View
+                          </button>
+                        ) : (
+                          <button className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
+                            Open Chart
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {!loading && charts.length > 0 && (
+            <div className="flex items-center justify-center gap-2 py-4 border-t border-slate-200">
+              <button
+                onClick={() => setPagination(p => ({ ...p, page: Math.max(1, p.page - 1) }))}
+                disabled={pagination.page === 1}
+                className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+
+              <span className="px-4 py-2 text-sm text-slate-600">
+                {pagination.page} / {pagination.pages}
+              </span>
+
+              <button
+                onClick={() => setPagination(p => ({ ...p, page: Math.min(p.pages, p.page + 1) }))}
+                disabled={pagination.page === pagination.pages}
+                className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ChartWorkQueue;
