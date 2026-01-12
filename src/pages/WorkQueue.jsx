@@ -5,7 +5,7 @@ import {
   FileText, CheckCircle2, Loader2, AlertTriangle, Bell, Inbox
 } from 'lucide-react';
 
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000/api';
+const API_BASE_URL = 'http://localhost:4000/api';
 
 const WorkQueue = () => {
   const navigate = useNavigate();
@@ -167,28 +167,41 @@ const WorkQueue = () => {
   const getSLABadge = (sla) => {
     if (!sla) return <span className="text-sm text-gray-400">--</span>;
 
+    // For charts still processing
+    if (!sla.isComplete) {
+      return (
+        <span className="inline-flex items-center gap-1 text-blue-600 text-sm font-medium">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          {sla.display || sla.hours}
+        </span>
+      );
+    }
+
+    // Critical: processing took too long (≥5 min)
     if (sla.isCritical) {
       return (
         <span className="inline-flex items-center gap-1 text-red-600 text-sm font-medium">
           <AlertTriangle className="w-4 h-4" />
-          {sla.hours}h
+          {sla.display || sla.hours}
         </span>
       );
     }
 
+    // Warning: processing took a while (≥2 min)
     if (sla.isWarning) {
       return (
         <span className="inline-flex items-center gap-1 text-amber-600 text-sm font-medium">
           <AlertTriangle className="w-4 h-4" />
-          {sla.hours}h
+          {sla.display || sla.hours}
         </span>
       );
     }
 
+    // Excellent or Good: processed quickly
     return (
       <span className="inline-flex items-center gap-1 text-emerald-600 text-sm font-medium">
         <CheckCircle2 className="w-4 h-4" />
-        {sla.hours}h
+        {sla.display || sla.hours}
       </span>
     );
   };
@@ -349,7 +362,7 @@ const WorkQueue = () => {
                 <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">Documents</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">AI Status</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">Review Status</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">SLA</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">Processing Time</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">Action</th>
               </tr>
             </thead>
@@ -373,8 +386,8 @@ const WorkQueue = () => {
                   <tr
                     key={chart.id}
                     className={`hover:bg-slate-50/50 transition-colors ${chart.aiStatus === 'queued' || chart.aiStatus === 'processing'
-                      ? 'bg-blue-50/30'
-                      : ''
+                        ? 'bg-blue-50/30'
+                        : ''
                       }`}
                   >
                     <td className="px-6 py-4">
@@ -406,10 +419,10 @@ const WorkQueue = () => {
                         onClick={() => handleOpenChart(chart.chartNumber)}
                         disabled={chart.aiStatus === 'queued' || chart.aiStatus === 'processing'}
                         className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${chart.aiStatus === 'queued' || chart.aiStatus === 'processing'
-                          ? 'text-slate-400 bg-slate-100 cursor-not-allowed'
-                          : chart.reviewStatus === 'submitted'
-                            ? 'text-slate-700 bg-white border border-slate-300 hover:bg-slate-50'
-                            : 'text-white bg-blue-600 hover:bg-blue-700'
+                            ? 'text-slate-400 bg-slate-100 cursor-not-allowed'
+                            : chart.reviewStatus === 'submitted'
+                              ? 'text-slate-700 bg-white border border-slate-300 hover:bg-slate-50'
+                              : 'text-white bg-blue-600 hover:bg-blue-700'
                           }`}
                       >
                         {chart.aiStatus === 'queued' ? 'Queued' :

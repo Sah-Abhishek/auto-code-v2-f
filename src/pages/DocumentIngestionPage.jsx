@@ -788,7 +788,7 @@ const DocumentIngestion = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-slate-700">Provider Name</label>
+              <label className="block text-sm font-medium text-slate-700">Practitioner</label>
               <input
                 type="text"
                 placeholder="Attending physician"

@@ -1041,7 +1041,7 @@ const ChartDetail = () => {
                               {item.reason && <p className="text-xs text-slate-500 mt-1">Reason: {item.reason}</p>}
                               {item.priority && (
                                 <span className={`inline-block mt-2 px-2 py-0.5 rounded text-xs font-medium ${item.priority === 'high' ? 'bg-red-100 text-red-700' :
-                                  item.priority === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'
+                                    item.priority === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'
                                   }`}>{item.priority} priority</span>
                               )}
                             </div>
@@ -1087,7 +1087,7 @@ const ChartDetail = () => {
                               <p className="font-medium text-slate-900 text-sm">{item.alert || item}</p>
                               {item.severity && (
                                 <span className={`inline-block mt-2 px-2 py-0.5 rounded text-xs font-medium ${item.severity === 'high' ? 'bg-red-100 text-red-700' :
-                                  item.severity === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'
+                                    item.severity === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'
                                   }`}>{item.severity} severity</span>
                               )}
                             </div>
@@ -1310,8 +1310,12 @@ const ChartDetail = () => {
                   <AlertCircle className="w-4 h-4 text-amber-600" />
                   <h3 className="font-semibold text-amber-900 text-sm">Chief Complaint</h3>
                 </div>
-                <p className="text-slate-800 font-medium">{aiSummary.chief_complaint.text}</p>
-                {aiSummary.chief_complaint.evidence?.exact_text && (
+                <p className="text-slate-800 font-medium">
+                  {typeof aiSummary.chief_complaint === 'string'
+                    ? aiSummary.chief_complaint
+                    : aiSummary.chief_complaint.text || JSON.stringify(aiSummary.chief_complaint)}
+                </p>
+                {typeof aiSummary.chief_complaint === 'object' && aiSummary.chief_complaint.evidence?.exact_text && (
                   <p className="text-xs text-amber-700 mt-2 italic border-l-2 border-amber-300 pl-2">
                     "{aiSummary.chief_complaint.evidence.exact_text}"
                   </p>
@@ -1326,8 +1330,12 @@ const ChartDetail = () => {
                   <ClipboardList className="w-4 h-4 text-blue-600" />
                   <h3 className="font-semibold text-slate-900 text-sm">History of Present Illness</h3>
                 </div>
-                <p className="text-sm text-slate-700 leading-relaxed">{aiSummary.history_of_present_illness.text}</p>
-                {aiSummary.history_of_present_illness.onset && (
+                <p className="text-sm text-slate-700 leading-relaxed">
+                  {typeof aiSummary.history_of_present_illness === 'string'
+                    ? aiSummary.history_of_present_illness
+                    : aiSummary.history_of_present_illness.text || aiSummary.history_of_present_illness.narrative || JSON.stringify(aiSummary.history_of_present_illness)}
+                </p>
+                {typeof aiSummary.history_of_present_illness === 'object' && (aiSummary.history_of_present_illness.onset || aiSummary.history_of_present_illness.duration || aiSummary.history_of_present_illness.severity) && (
                   <div className="mt-2 flex gap-4 text-xs text-slate-500">
                     {aiSummary.history_of_present_illness.onset && <span>Onset: {aiSummary.history_of_present_illness.onset}</span>}
                     {aiSummary.history_of_present_illness.duration && <span>Duration: {aiSummary.history_of_present_illness.duration}</span>}
@@ -1345,42 +1353,86 @@ const ChartDetail = () => {
                   <h3 className="font-semibold text-slate-900 text-sm">Vital Signs</h3>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  {(chart?.vitalsSummary?.blood_pressure || aiSummary.vitals?.blood_pressure) && (
-                    <div className="flex items-center gap-2 p-2 bg-red-50 rounded-lg">
-                      <Heart className="w-4 h-4 text-red-500" />
-                      <div>
-                        <p className="text-xs text-slate-500">BP</p>
-                        <p className="font-semibold text-slate-900">{chart?.vitalsSummary?.blood_pressure || aiSummary.vitals?.blood_pressure}</p>
-                      </div>
-                    </div>
-                  )}
-                  {(chart?.vitalsSummary?.heart_rate || aiSummary.vitals?.heart_rate) && (
-                    <div className="flex items-center gap-2 p-2 bg-pink-50 rounded-lg">
-                      <Activity className="w-4 h-4 text-pink-500" />
-                      <div>
-                        <p className="text-xs text-slate-500">HR</p>
-                        <p className="font-semibold text-slate-900">{chart?.vitalsSummary?.heart_rate || aiSummary.vitals?.heart_rate}</p>
-                      </div>
-                    </div>
-                  )}
-                  {(chart?.vitalsSummary?.temperature || aiSummary.vitals?.temperature) && (
-                    <div className="flex items-center gap-2 p-2 bg-orange-50 rounded-lg">
-                      <Thermometer className="w-4 h-4 text-orange-500" />
-                      <div>
-                        <p className="text-xs text-slate-500">Temp</p>
-                        <p className="font-semibold text-slate-900">{chart?.vitalsSummary?.temperature || aiSummary.vitals?.temperature}</p>
-                      </div>
-                    </div>
-                  )}
-                  {(chart?.vitalsSummary?.oxygen_saturation || aiSummary.vitals?.oxygen_saturation) && (
-                    <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
-                      <Activity className="w-4 h-4 text-blue-500" />
-                      <div>
-                        <p className="text-xs text-slate-500">SpO2</p>
-                        <p className="font-semibold text-slate-900">{chart?.vitalsSummary?.oxygen_saturation || aiSummary.vitals?.oxygen_saturation}</p>
-                      </div>
-                    </div>
-                  )}
+                  {(() => {
+                    const vitals = chart?.vitalsSummary || aiSummary.vitals || {};
+                    const formatVital = (val) => {
+                      if (!val) return null;
+                      if (typeof val === 'string' || typeof val === 'number') return val;
+                      if (typeof val === 'object') {
+                        // Handle object format - join values or return first value
+                        if (val.value) return val.value;
+                        if (val.systolic && val.diastolic) return `${val.systolic}/${val.diastolic}`;
+                        return Object.values(val).filter(v => v !== null && v !== undefined).join(' / ');
+                      }
+                      return String(val);
+                    };
+
+                    const bp = formatVital(vitals.blood_pressure);
+                    const hr = formatVital(vitals.heart_rate);
+                    const temp = formatVital(vitals.temperature);
+                    const spo2 = formatVital(vitals.oxygen_saturation);
+                    const rr = formatVital(vitals.respiratory_rate);
+                    const pain = formatVital(vitals.pain_score);
+
+                    return (
+                      <>
+                        {bp && (
+                          <div className="flex items-center gap-2 p-2 bg-red-50 rounded-lg">
+                            <Heart className="w-4 h-4 text-red-500" />
+                            <div>
+                              <p className="text-xs text-slate-500">BP</p>
+                              <p className="font-semibold text-slate-900">{bp}</p>
+                            </div>
+                          </div>
+                        )}
+                        {hr && (
+                          <div className="flex items-center gap-2 p-2 bg-pink-50 rounded-lg">
+                            <Activity className="w-4 h-4 text-pink-500" />
+                            <div>
+                              <p className="text-xs text-slate-500">HR</p>
+                              <p className="font-semibold text-slate-900">{hr}</p>
+                            </div>
+                          </div>
+                        )}
+                        {temp && (
+                          <div className="flex items-center gap-2 p-2 bg-orange-50 rounded-lg">
+                            <Thermometer className="w-4 h-4 text-orange-500" />
+                            <div>
+                              <p className="text-xs text-slate-500">Temp</p>
+                              <p className="font-semibold text-slate-900">{temp}</p>
+                            </div>
+                          </div>
+                        )}
+                        {spo2 && (
+                          <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
+                            <Activity className="w-4 h-4 text-blue-500" />
+                            <div>
+                              <p className="text-xs text-slate-500">SpO2</p>
+                              <p className="font-semibold text-slate-900">{spo2}</p>
+                            </div>
+                          </div>
+                        )}
+                        {rr && (
+                          <div className="flex items-center gap-2 p-2 bg-teal-50 rounded-lg">
+                            <Activity className="w-4 h-4 text-teal-500" />
+                            <div>
+                              <p className="text-xs text-slate-500">RR</p>
+                              <p className="font-semibold text-slate-900">{rr}</p>
+                            </div>
+                          </div>
+                        )}
+                        {pain && (
+                          <div className="flex items-center gap-2 p-2 bg-amber-50 rounded-lg">
+                            <AlertCircle className="w-4 h-4 text-amber-500" />
+                            <div>
+                              <p className="text-xs text-slate-500">Pain</p>
+                              <p className="font-semibold text-slate-900">{pain}</p>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             )}
@@ -1396,12 +1448,15 @@ const ChartDetail = () => {
                   <p className="text-sm text-slate-700">{aiSummary.physical_examination}</p>
                 ) : (
                   <div className="space-y-2">
-                    {Object.entries(aiSummary.physical_examination).map(([system, finding]) => (
-                      <div key={system} className="text-sm">
-                        <span className="font-medium text-slate-800 capitalize">{system.replace(/_/g, ' ')}:</span>{' '}
-                        <span className="text-slate-600">{finding}</span>
-                      </div>
-                    ))}
+                    {Object.entries(aiSummary.physical_examination).map(([system, finding]) => {
+                      const findingText = typeof finding === 'object' ? JSON.stringify(finding) : String(finding || '');
+                      return (
+                        <div key={system} className="text-sm">
+                          <span className="font-medium text-slate-800 capitalize">{system.replace(/_/g, ' ')}:</span>{' '}
+                          <span className="text-slate-600">{findingText}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1421,13 +1476,21 @@ const ChartDetail = () => {
                     {aiSummary.assessment_and_plan.assessment && (
                       <div>
                         <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">Assessment</p>
-                        <p className="text-sm text-slate-700">{aiSummary.assessment_and_plan.assessment}</p>
+                        <p className="text-sm text-slate-700">
+                          {typeof aiSummary.assessment_and_plan.assessment === 'object'
+                            ? JSON.stringify(aiSummary.assessment_and_plan.assessment)
+                            : aiSummary.assessment_and_plan.assessment}
+                        </p>
                       </div>
                     )}
                     {aiSummary.assessment_and_plan.plan && (
                       <div className="mt-2">
                         <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">Plan</p>
-                        <p className="text-sm text-slate-700">{aiSummary.assessment_and_plan.plan}</p>
+                        <p className="text-sm text-slate-700">
+                          {typeof aiSummary.assessment_and_plan.plan === 'object'
+                            ? JSON.stringify(aiSummary.assessment_and_plan.plan)
+                            : aiSummary.assessment_and_plan.plan}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -1443,44 +1506,31 @@ const ChartDetail = () => {
                   <h3 className="font-semibold text-slate-900 text-sm">Visit Timeline</h3>
                 </div>
                 <div className="space-y-3">
-                  {aiSummary.timeline_of_care.map((event, idx) => (
-                    <div key={idx} className="flex gap-3">
-                      <div className="flex flex-col items-center">
-                        <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                        {idx < aiSummary.timeline_of_care.length - 1 && <div className="w-0.5 h-full bg-blue-200 mt-1" />}
+                  {aiSummary.timeline_of_care.map((event, idx) => {
+                    const eventTime = typeof event.time === 'object' ? JSON.stringify(event.time) : event.time;
+                    const eventName = typeof event.event === 'object' ? JSON.stringify(event.event) : event.event;
+                    const eventDesc = typeof event.description === 'object' ? JSON.stringify(event.description) : event.description;
+
+                    return (
+                      <div key={idx} className="flex gap-3">
+                        <div className="flex flex-col items-center">
+                          <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                          {idx < aiSummary.timeline_of_care.length - 1 && <div className="w-0.5 h-full bg-blue-200 mt-1" />}
+                        </div>
+                        <div className="flex-1 pb-4">
+                          <p className="font-medium text-slate-900 text-sm">{eventTime && `${eventTime} - `}{eventName}</p>
+                          {eventDesc && <p className="text-xs text-slate-600">{eventDesc}</p>}
+                        </div>
                       </div>
-                      <div className="flex-1 pb-4">
-                        <p className="font-medium text-slate-900 text-sm">{event.time && `${event.time} - `}{event.event}</p>
-                        <p className="text-xs text-slate-600">{event.description}</p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
 
             {/* Medications */}
             {chart?.medications?.length > 0 && (
-              <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-                <div className="flex items-center gap-2 mb-3">
-                  <Pill className="w-4 h-4 text-purple-600" />
-                  <h3 className="font-semibold text-slate-900 text-sm">Medications</h3>
-                  <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">{chart.medications.length}</span>
-                </div>
-                <div className="space-y-2">
-                  {chart.medications.slice(0, 5).map((med, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-2 bg-purple-50 rounded-lg">
-                      <div>
-                        <p className="font-medium text-slate-900 text-sm">{med.name}</p>
-                        <p className="text-xs text-slate-500">{med.dose} {med.route} {med.frequency}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {chart.medications.length > 5 && (
-                    <p className="text-xs text-slate-500 text-center">+ {chart.medications.length - 5} more medications</p>
-                  )}
-                </div>
-              </div>
+              <MedicationsSection medications={chart.medications} />
             )}
 
             {/* Clinical Alerts */}
@@ -1491,15 +1541,20 @@ const ChartDetail = () => {
                   <h3 className="font-semibold text-red-900 text-sm">Clinical Alerts</h3>
                 </div>
                 <div className="space-y-2">
-                  {aiSummary.clinical_alerts.map((alert, idx) => (
-                    <div key={idx} className={`p-3 rounded-lg border ${alert.severity === 'high' ? 'bg-red-100 border-red-300' :
-                      alert.severity === 'medium' ? 'bg-amber-100 border-amber-300' : 'bg-blue-100 border-blue-300'
-                      }`}>
-                      <p className={`font-medium text-sm ${alert.severity === 'high' ? 'text-red-800' :
-                        alert.severity === 'medium' ? 'text-amber-800' : 'text-blue-800'
-                        }`}>{alert.alert}</p>
-                    </div>
-                  ))}
+                  {aiSummary.clinical_alerts.map((alert, idx) => {
+                    const alertText = typeof alert === 'string' ? alert : (alert.alert || alert.message || alert.text || JSON.stringify(alert));
+                    const severity = typeof alert === 'object' ? alert.severity : null;
+
+                    return (
+                      <div key={idx} className={`p-3 rounded-lg border ${severity === 'high' ? 'bg-red-100 border-red-300' :
+                        severity === 'medium' ? 'bg-amber-100 border-amber-300' : 'bg-blue-100 border-blue-300'
+                        }`}>
+                        <p className={`font-medium text-sm ${severity === 'high' ? 'text-red-800' :
+                          severity === 'medium' ? 'text-amber-800' : 'text-blue-800'
+                          }`}>{alertText}</p>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -1517,21 +1572,21 @@ const ChartDetail = () => {
 
           <div className="flex-1 overflow-auto p-4 space-y-6">
             {/* 1. Reason for Admit */}
-            {/* <CodeSection */}
-            {/*   title="Reason for Admit" */}
-            {/*   category="reason_for_admit" */}
-            {/*   codes={workingCodes.reason_for_admit} */}
-            {/*   originalCodes={originalAICodes.reason_for_admit} */}
-            {/*   onAdd={() => handleAddCode('reason_for_admit')} */}
-            {/*   onModify={(idx) => handleCodeModify('reason_for_admit', idx, originalAICodes.reason_for_admit?.[idx])} */}
-            {/*   onAccept={(idx) => handleCodeAccept('reason_for_admit', idx)} */}
-            {/*   onReject={(idx) => handleCodeReject('reason_for_admit', idx)} */}
-            {/*   onReset={(idx) => handleCodeReset('reason_for_admit', idx)} */}
-            {/*   accentColor="red" */}
-            {/*   renderCode={(code) => code.icd_10_code} */}
-            {/*   renderDescription={(code) => code.description} */}
-            {/*   isReadOnly={isReadOnly} */}
-            {/* /> */}
+            <CodeSection
+              title="Reason for Admit"
+              category="reason_for_admit"
+              codes={workingCodes.reason_for_admit}
+              originalCodes={originalAICodes.reason_for_admit}
+              onAdd={() => handleAddCode('reason_for_admit')}
+              onModify={(idx) => handleCodeModify('reason_for_admit', idx, originalAICodes.reason_for_admit?.[idx])}
+              onAccept={(idx) => handleCodeAccept('reason_for_admit', idx)}
+              onReject={(idx) => handleCodeReject('reason_for_admit', idx)}
+              onReset={(idx) => handleCodeReset('reason_for_admit', idx)}
+              accentColor="red"
+              renderCode={(code) => code.icd_10_code}
+              renderDescription={(code) => code.description}
+              isReadOnly={isReadOnly}
+            />
 
             {/* 2. Primary Diagnosis */}
             <CodeSection
@@ -1871,6 +1926,57 @@ const CodeRow = ({ code, originalCode, renderCode, renderDescription, onModify, 
       {code.evidence?.[0]?.exact_text && !isRejected && (
         <p className="text-xs text-blue-600 italic">"{code.evidence[0].exact_text}"</p>
       )}
+    </div>
+  );
+};
+
+// Medications Section Component with expand/collapse
+const MedicationsSection = ({ medications }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const INITIAL_SHOW = 5;
+  const hasMore = medications.length > INITIAL_SHOW;
+  const displayedMeds = isExpanded ? medications : medications.slice(0, INITIAL_SHOW);
+
+  return (
+    <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+      <div className="flex items-center gap-2 mb-3">
+        <Pill className="w-4 h-4 text-purple-600" />
+        <h3 className="font-semibold text-slate-900 text-sm">Medications</h3>
+        <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">{medications.length}</span>
+      </div>
+      <div className="space-y-2">
+        {displayedMeds.map((med, idx) => {
+          const medName = typeof med === 'string' ? med : (med.name || med.medication || 'Unknown');
+          const medDetails = typeof med === 'object' ? [med.dose, med.route, med.frequency].filter(Boolean).join(' ') : '';
+
+          return (
+            <div key={idx} className="flex items-center justify-between p-2 bg-purple-50 rounded-lg">
+              <div>
+                <p className="font-medium text-slate-900 text-sm">{medName}</p>
+                {medDetails && <p className="text-xs text-slate-500">{medDetails}</p>}
+              </div>
+            </div>
+          );
+        })}
+        {hasMore && (
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="w-full py-2 text-sm text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors flex items-center justify-center gap-1 font-medium"
+          >
+            {isExpanded ? (
+              <>
+                <ChevronDown className="w-4 h-4 rotate-180" />
+                Show less
+              </>
+            ) : (
+              <>
+                <ChevronDown className="w-4 h-4" />
+                + {medications.length - INITIAL_SHOW} more medications
+              </>
+            )}
+          </button>
+        )}
+      </div>
     </div>
   );
 };
