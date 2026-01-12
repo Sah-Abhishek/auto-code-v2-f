@@ -6,7 +6,8 @@ import {
   ChevronRight, Loader2, Info, Stethoscope, FlaskConical, ScanLine,
   ClipboardCheck, ExternalLink, Eye, FileImage, Activity, Hash,
   AlertCircle, MessageSquare, Lightbulb, ShieldAlert, Save, Send,
-  ChevronDown, FileCheck
+  ChevronDown, FileCheck, Heart, Pill, Thermometer, User, Calendar,
+  MapPin, Building, UserCheck, ClipboardList, Zap, Bell
 } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000/api';
@@ -118,6 +119,13 @@ const FEEDBACK_REASONS = {
     'Unsupported Documentation Modifier',
     'Overlapping Service Modifier'
   ],
+  'reason-for-admit': [
+    'Documentation Does Not Support Reason',
+    'Incorrect Principal Reason',
+    'Missing Admission Criteria',
+    'Wrong Category Selection',
+    'Incomplete Clinical Picture'
+  ],
   'feedback': [
     'Coding Error',
     'Documentation Error',
@@ -135,6 +143,7 @@ const FEEDBACK_REASONS = {
 
 // Map internal category names to dropdown keys
 const CATEGORY_TO_DROPDOWN_KEY = {
+  'reason_for_admit': 'reason-for-admit',
   'ed_em_level': 'ed-em',
   'procedures': 'procedures',
   'primary_diagnosis': 'primary-dx',
@@ -165,10 +174,10 @@ const StyledSelect = ({ value, onChange, options, placeholder }) => {
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={`w-full px-4 py-3 text-left bg-white border-2 rounded-xl transition-all duration-200 flex items-center justify-between ${isOpen
-            ? 'border-blue-500 ring-4 ring-blue-100'
-            : value
-              ? 'border-slate-300 hover:border-slate-400'
-              : 'border-slate-200 hover:border-slate-300'
+          ? 'border-blue-500 ring-4 ring-blue-100'
+          : value
+            ? 'border-slate-300 hover:border-slate-400'
+            : 'border-slate-200 hover:border-slate-300'
           }`}
       >
         <span className={value ? 'text-slate-900' : 'text-slate-400'}>
@@ -189,8 +198,8 @@ const StyledSelect = ({ value, onChange, options, placeholder }) => {
                   setIsOpen(false);
                 }}
                 className={`w-full px-4 py-2.5 text-left rounded-lg transition-colors text-sm ${value === option
-                    ? 'bg-blue-50 text-blue-700 font-medium'
-                    : 'text-slate-700 hover:bg-slate-50'
+                  ? 'bg-blue-50 text-blue-700 font-medium'
+                  : 'text-slate-700 hover:bg-slate-50'
                   }`}
               >
                 {option}
@@ -225,6 +234,7 @@ const CodeEditModal = ({ isOpen, onClose, onSave, category, code, isNew, origina
 
   const getCategoryLabel = () => {
     switch (category) {
+      case 'reason_for_admit': return 'Reason for Admit';
       case 'ed_em_level': return 'ED/EM Level';
       case 'procedures': return 'Procedure';
       case 'primary_diagnosis': return 'Primary Diagnosis';
@@ -364,10 +374,11 @@ const ReviewModal = ({ isOpen, onClose, onSubmit, workingCodes, submitting }) =>
   };
 
   const categories = [
-    { key: 'ed_em_level', title: 'ED/EM Level', color: 'blue', getCode: c => c.code, getDesc: c => c.description },
-    { key: 'procedures', title: 'Procedures', color: 'purple', getCode: c => c.cpt_code, getDesc: c => c.procedure_name || c.description },
+    { key: 'reason_for_admit', title: 'Reason for Admit', color: 'red', getCode: c => c.icd_10_code, getDesc: c => c.description },
     { key: 'primary_diagnosis', title: 'Primary Diagnosis', color: 'emerald', getCode: c => c.icd_10_code, getDesc: c => c.description },
     { key: 'secondary_diagnoses', title: 'Secondary Diagnoses', color: 'amber', getCode: c => c.icd_10_code, getDesc: c => c.description },
+    { key: 'procedures', title: 'Procedures (CPT)', color: 'purple', getCode: c => c.cpt_code, getDesc: c => c.procedure_name || c.description },
+    { key: 'ed_em_level', title: 'ED/EM Level', color: 'blue', getCode: c => c.code, getDesc: c => c.description },
     { key: 'modifiers', title: 'Modifiers', color: 'slate', getCode: c => c.modifier_code, getDesc: c => c.modifier_name }
   ];
 
@@ -376,7 +387,8 @@ const ReviewModal = ({ isOpen, onClose, onSubmit, workingCodes, submitting }) =>
     purple: 'bg-purple-50 border-purple-200 text-purple-700',
     emerald: 'bg-emerald-50 border-emerald-200 text-emerald-700',
     amber: 'bg-amber-50 border-amber-200 text-amber-700',
-    slate: 'bg-slate-50 border-slate-200 text-slate-700'
+    slate: 'bg-slate-50 border-slate-200 text-slate-700',
+    red: 'bg-red-50 border-red-200 text-red-700'
   };
 
   const totalFinal = categories.reduce((sum, cat) => sum + getFinalCodes(workingCodes[cat.key]).length, 0);
@@ -442,17 +454,32 @@ const ReviewModal = ({ isOpen, onClose, onSubmit, workingCodes, submitting }) =>
                   {finalCodes.map((code, idx) => (
                     <div
                       key={idx}
-                      className={`px-4 py-3 rounded-xl border-2 ${colorClasses[color]} flex items-center justify-between`}
+                      className={`px-4 py-3 rounded-xl border-2 ${colorClasses[color]}`}
                     >
-                      <div className="flex items-center gap-3">
-                        <span className="font-bold font-mono">{getCode(code)}</span>
-                        <span className="text-slate-600">{getDesc(code)}</span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold font-mono">{getCode(code)}</span>
+                          <span className="text-slate-600">{getDesc(code)}</span>
+                        </div>
+                        {code.status === 'modified' && (
+                          <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs font-medium">Modified</span>
+                        )}
+                        {code.status === 'added' && (
+                          <span className="px-2 py-1 bg-violet-100 text-violet-700 rounded-lg text-xs font-medium">Added</span>
+                        )}
                       </div>
-                      {code.status === 'modified' && (
-                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs font-medium">Modified</span>
-                      )}
-                      {code.status === 'added' && (
-                        <span className="px-2 py-1 bg-violet-100 text-violet-700 rounded-lg text-xs font-medium">Added</span>
+                      {/* Show reason in review modal too */}
+                      {code.changeReason && (
+                        <div className="mt-2 pt-2 border-t border-slate-200">
+                          <p className="text-xs text-slate-600">
+                            <span className="font-semibold">Reason:</span> {code.changeReason}
+                          </p>
+                          {code.changeComment && (
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              <span className="font-semibold">Comment:</span> {code.changeComment}
+                            </p>
+                          )}
+                        </div>
                       )}
                     </div>
                   ))}
@@ -515,6 +542,19 @@ const ChartDetail = () => {
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showFeedbackDropdown, setShowFeedbackDropdown] = useState(false);
+  const feedbackDropdownRef = useRef(null);
+
+  // Close feedback dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (feedbackDropdownRef.current && !feedbackDropdownRef.current.contains(event.target)) {
+        setShowFeedbackDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Document viewer state
   const [activeDocType, setActiveDocType] = useState('all');
@@ -523,6 +563,7 @@ const ChartDetail = () => {
 
   // Working codes state - tracks current state with modifications
   const [workingCodes, setWorkingCodes] = useState({
+    reason_for_admit: [],
     ed_em_level: [],
     procedures: [],
     primary_diagnosis: [],
@@ -532,6 +573,7 @@ const ChartDetail = () => {
 
   // Modifications tracking
   const [modifications, setModifications] = useState({
+    reason_for_admit: [],
     ed_em_level: [],
     procedures: [],
     primary_diagnosis: [],
@@ -557,6 +599,9 @@ const ChartDetail = () => {
     { id: 'discharge', label: 'Discharge', icon: ClipboardCheck }
   ];
 
+  // Check if chart is submitted (read-only mode)
+  const isReadOnly = chart?.reviewStatus === 'submitted';
+
   // Initialize working codes from chart data - DEFAULT TO ACCEPTED
   useEffect(() => {
     if (chart) {
@@ -573,6 +618,7 @@ const ChartDetail = () => {
       };
 
       setWorkingCodes({
+        reason_for_admit: setDefaultAccepted(diagCodes.reason_for_admit || originalCodes.reason_for_admit || []),
         ed_em_level: setDefaultAccepted(diagCodes.ed_em_level || originalCodes.ed_em_level || []),
         procedures: setDefaultAccepted(chart.procedures || originalCodes.procedures || []),
         primary_diagnosis: setDefaultAccepted(diagCodes.primary_diagnosis || originalCodes.primary_diagnosis || []),
@@ -611,6 +657,7 @@ const ChartDetail = () => {
 
   // Handle code modification
   const handleCodeModify = (category, index, originalCode) => {
+    if (isReadOnly) return;
     const code = workingCodes[category]?.[index];
     setModalState({
       isOpen: true,
@@ -624,6 +671,7 @@ const ChartDetail = () => {
 
   // Handle add new code
   const handleAddCode = (category) => {
+    if (isReadOnly) return;
     setModalState({
       isOpen: true,
       category,
@@ -634,7 +682,7 @@ const ChartDetail = () => {
     });
   };
 
-  // Handle modal save
+  // Handle modal save - UPDATED to store reason on code object
   const handleModalSave = (data) => {
     const { category, code, description, reason, comment, original } = data;
     const timestamp = new Date().toISOString();
@@ -644,6 +692,9 @@ const ChartDetail = () => {
       const newCode = buildCodeObject(category, code, description);
       newCode.status = 'added';
       newCode.isUserAdded = true;
+      newCode.changeReason = reason;
+      newCode.changeComment = comment;
+      newCode.changedAt = timestamp;
 
       setWorkingCodes(prev => ({
         ...prev,
@@ -666,6 +717,9 @@ const ChartDetail = () => {
       modifiedCode.status = 'modified';
       modifiedCode.isModified = true;
       modifiedCode.originalCode = original;
+      modifiedCode.changeReason = reason;
+      modifiedCode.changeComment = comment;
+      modifiedCode.changedAt = timestamp;
 
       setWorkingCodes(prev => {
         const updated = [...(prev[category] || [])];
@@ -694,6 +748,7 @@ const ChartDetail = () => {
         return { code, description, confidence: 'high' };
       case 'procedures':
         return { cpt_code: code, procedure_name: description, confidence: 'high' };
+      case 'reason_for_admit':
       case 'primary_diagnosis':
       case 'secondary_diagnoses':
         return { icd_10_code: code, description, confidence: 'high' };
@@ -706,6 +761,7 @@ const ChartDetail = () => {
 
   // Handle code accept
   const handleCodeAccept = (category, index) => {
+    if (isReadOnly) return;
     setWorkingCodes(prev => {
       const updated = [...(prev[category] || [])];
       if (updated[index]) {
@@ -717,6 +773,7 @@ const ChartDetail = () => {
 
   // Handle code reject
   const handleCodeReject = (category, index) => {
+    if (isReadOnly) return;
     const code = workingCodes[category]?.[index];
 
     setWorkingCodes(prev => {
@@ -739,6 +796,7 @@ const ChartDetail = () => {
 
   // Handle code reset - resets to accepted (default)
   const handleCodeReset = (category, index) => {
+    if (isReadOnly) return;
     const originalCodes = chart?.originalAICodes || {};
     const originalCode = originalCodes[category]?.[index];
 
@@ -763,6 +821,7 @@ const ChartDetail = () => {
     try {
       // Build final codes (excluding rejected)
       const finalCodes = {
+        reason_for_admit: workingCodes.reason_for_admit.filter(c => c.status !== 'rejected'),
         ed_em_level: workingCodes.ed_em_level.filter(c => c.status !== 'rejected'),
         procedures: workingCodes.procedures.filter(c => c.status !== 'rejected'),
         primary_diagnosis: workingCodes.primary_diagnosis.filter(c => c.status !== 'rejected'),
@@ -846,6 +905,13 @@ const ChartDetail = () => {
     compliance_alerts: codingNotes?.compliance_alerts || []
   };
 
+  // Calculate total feedback count for bell icon badge
+  const totalFeedbackCount =
+    feedback.documentation_gaps.length +
+    feedback.physician_queries_needed.length +
+    feedback.coding_tips.length +
+    feedback.compliance_alerts.length;
+
   const isPDF = (doc) => doc?.mimeType === 'application/pdf' || doc?.filename?.toLowerCase().endsWith('.pdf');
   const isImage = (doc) => doc?.mimeType?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|tiff)$/i.test(doc?.filename || '');
 
@@ -895,16 +961,144 @@ const ChartDetail = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          {hasModifications && (
+          {!isReadOnly && hasModifications && (
             <span className="px-2 py-1 rounded text-xs bg-amber-100 text-amber-700">
               Unsaved Changes
             </span>
           )}
 
-          {rejectedCount > 0 && (
+          {!isReadOnly && rejectedCount > 0 && (
             <span className="px-2 py-1 rounded text-xs bg-red-100 text-red-700">
               {rejectedCount} Rejected
             </span>
+          )}
+
+          {/* Feedback Bell Icon */}
+          {totalFeedbackCount > 0 && (
+            <div className="relative" ref={feedbackDropdownRef}>
+              <button
+                onClick={() => setShowFeedbackDropdown(!showFeedbackDropdown)}
+                className={`relative p-2 rounded-lg transition-colors ${showFeedbackDropdown ? 'bg-amber-100 text-amber-700' : 'hover:bg-slate-100 text-slate-600'}`}
+              >
+                <Bell className="w-5 h-5" />
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 rounded-full text-[10px] text-white flex items-center justify-center font-bold">
+                  {totalFeedbackCount}
+                </span>
+              </button>
+
+              {/* Feedback Dropdown */}
+              {showFeedbackDropdown && (
+                <div className="absolute right-0 top-full mt-2 w-[420px] bg-white rounded-xl shadow-2xl border border-slate-200 z-50 max-h-[70vh] overflow-hidden flex flex-col">
+                  <div className="px-4 py-3 border-b border-slate-200 bg-gradient-to-r from-amber-50 to-white flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-4 h-4 text-amber-600" />
+                      <span className="font-semibold text-slate-900">Coding Feedback</span>
+                      <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
+                        {totalFeedbackCount} items
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setShowFeedbackDropdown(false)}
+                      className="p-1 hover:bg-slate-100 rounded-lg"
+                    >
+                      <X className="w-4 h-4 text-slate-400" />
+                    </button>
+                  </div>
+
+                  <div className="overflow-y-auto flex-1 p-3 space-y-3">
+                    {/* Documentation Gaps */}
+                    {feedback.documentation_gaps?.length > 0 && (
+                      <div className="bg-white rounded-xl border border-slate-200">
+                        <div className="px-3 py-2 border-b border-slate-100 flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 text-amber-600" />
+                          <span className="font-medium text-slate-900 text-sm">Documentation Gaps</span>
+                          <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">{feedback.documentation_gaps.length}</span>
+                        </div>
+                        <div className="divide-y divide-slate-100">
+                          {feedback.documentation_gaps.map((item, idx) => (
+                            <div key={idx} className="p-3">
+                              <p className="font-medium text-slate-900 text-sm">{item.gap || item}</p>
+                              {item.impact && <p className="text-xs text-amber-600 mt-1">Impact: {item.impact}</p>}
+                              {item.suggestion && <p className="text-xs text-slate-500 mt-1">Suggestion: {item.suggestion}</p>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Physician Queries */}
+                    {feedback.physician_queries_needed?.length > 0 && (
+                      <div className="bg-white rounded-xl border border-slate-200">
+                        <div className="px-3 py-2 border-b border-slate-100 flex items-center gap-2">
+                          <MessageSquare className="w-4 h-4 text-blue-600" />
+                          <span className="font-medium text-slate-900 text-sm">Physician Queries</span>
+                          <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">{feedback.physician_queries_needed.length}</span>
+                        </div>
+                        <div className="divide-y divide-slate-100">
+                          {feedback.physician_queries_needed.map((item, idx) => (
+                            <div key={idx} className="p-3">
+                              <p className="font-medium text-slate-900 text-sm">{item.query || item}</p>
+                              {item.reason && <p className="text-xs text-slate-500 mt-1">Reason: {item.reason}</p>}
+                              {item.priority && (
+                                <span className={`inline-block mt-2 px-2 py-0.5 rounded text-xs font-medium ${item.priority === 'high' ? 'bg-red-100 text-red-700' :
+                                  item.priority === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'
+                                  }`}>{item.priority} priority</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Coding Tips */}
+                    {feedback.coding_tips?.length > 0 && (
+                      <div className="bg-white rounded-xl border border-slate-200">
+                        <div className="px-3 py-2 border-b border-slate-100 flex items-center gap-2">
+                          <Lightbulb className="w-4 h-4 text-emerald-600" />
+                          <span className="font-medium text-slate-900 text-sm">Coding Tips</span>
+                          <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs">{feedback.coding_tips.length}</span>
+                        </div>
+                        <div className="divide-y divide-slate-100">
+                          {feedback.coding_tips.map((item, idx) => (
+                            <div key={idx} className="p-3">
+                              <p className="font-medium text-slate-900 text-sm">{item.tip || item}</p>
+                              {item.related_code && (
+                                <span className="inline-block mt-2 px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-700">
+                                  Related: {item.related_code}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Compliance Alerts */}
+                    {feedback.compliance_alerts?.length > 0 && (
+                      <div className="bg-white rounded-xl border border-red-200">
+                        <div className="px-3 py-2 border-b border-red-100 flex items-center gap-2 bg-red-50 rounded-t-xl">
+                          <ShieldAlert className="w-4 h-4 text-red-600" />
+                          <span className="font-medium text-red-900 text-sm">Compliance Alerts</span>
+                          <span className="px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-xs">{feedback.compliance_alerts.length}</span>
+                        </div>
+                        <div className="divide-y divide-red-100">
+                          {feedback.compliance_alerts.map((item, idx) => (
+                            <div key={idx} className="p-3">
+                              <p className="font-medium text-slate-900 text-sm">{item.alert || item}</p>
+                              {item.severity && (
+                                <span className={`inline-block mt-2 px-2 py-0.5 rounded text-xs font-medium ${item.severity === 'high' ? 'bg-red-100 text-red-700' :
+                                  item.severity === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'
+                                  }`}>{item.severity} severity</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${chart?.reviewStatus === 'submitted' ? 'bg-emerald-100 text-emerald-700' :
@@ -915,7 +1109,7 @@ const ChartDetail = () => {
               chart?.reviewStatus === 'in_review' ? '◉ In Review' : '✓ Submitted'}
           </span>
 
-          {chart?.reviewStatus !== 'submitted' && (
+          {!isReadOnly && (
             <button
               onClick={handleReviewClick}
               className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center gap-2 shadow-lg shadow-emerald-200 transition-all"
@@ -1053,29 +1247,200 @@ const ChartDetail = () => {
           )}
         </div>
 
-        {/* Middle Column - AI Clinical Summary */}
-        <div className="w-[380px] flex-shrink-0 bg-white border-r border-slate-200 flex flex-col overflow-hidden">
-          <div className="p-4 border-b border-slate-200">
-            <h2 className="font-semibold text-slate-900">AI Clinical Summary</h2>
-            <p className="text-xs text-slate-500">Generated from source documents</p>
+        {/* Middle Column - AI Clinical Summary (Enhanced) */}
+        <div className="w-[420px] flex-shrink-0 bg-white border-r border-slate-200 flex flex-col overflow-hidden">
+          <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-indigo-50 to-white">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-indigo-100 rounded-lg">
+                <Zap className="w-4 h-4 text-indigo-600" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-slate-900">AI Clinical Summary</h2>
+                <p className="text-xs text-slate-500">Comprehensive analysis from source documents</p>
+              </div>
+            </div>
           </div>
 
-          <div className="flex-1 overflow-auto p-4 space-y-6">
-            {aiSummary.chief_complaint && (
-              <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <Info className="w-4 h-4 text-amber-600" />
-                  <h3 className="font-semibold text-amber-900">Chief Complaint</h3>
+          <div className="flex-1 overflow-auto p-4 space-y-5">
+            {/* Patient Demographics */}
+            {(aiSummary.patient_demographics || chart?.mrn) && (
+              <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <User className="w-4 h-4 text-slate-600" />
+                  <h3 className="font-semibold text-slate-900 text-sm">Patient Information</h3>
                 </div>
-                <p className="text-slate-800">{aiSummary.chief_complaint.text}</p>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Hash className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-slate-600">MRN:</span>
+                    <span className="font-medium text-slate-900">{chart?.mrn || 'N/A'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-slate-600">DOS:</span>
+                    <span className="font-medium text-slate-900">{chart?.dateOfService ? new Date(chart.dateOfService).toLocaleDateString() : 'N/A'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Building className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-slate-600">Facility:</span>
+                    <span className="font-medium text-slate-900">{chart?.facility || 'N/A'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-slate-600">Provider:</span>
+                    <span className="font-medium text-slate-900">{chart?.provider || aiSummary.attending_provider || 'N/A'}</span>
+                  </div>
+                  {aiSummary.patient_demographics?.age && (
+                    <div className="flex items-center gap-2">
+                      <User className="w-3.5 h-3.5 text-slate-400" />
+                      <span className="text-slate-600">Age/Sex:</span>
+                      <span className="font-medium text-slate-900">
+                        {aiSummary.patient_demographics.age} {aiSummary.patient_demographics.sex}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
+            {/* Chief Complaint - Highlighted */}
+            {aiSummary.chief_complaint && (
+              <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-4 border border-amber-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertCircle className="w-4 h-4 text-amber-600" />
+                  <h3 className="font-semibold text-amber-900 text-sm">Chief Complaint</h3>
+                </div>
+                <p className="text-slate-800 font-medium">{aiSummary.chief_complaint.text}</p>
+                {aiSummary.chief_complaint.evidence?.exact_text && (
+                  <p className="text-xs text-amber-700 mt-2 italic border-l-2 border-amber-300 pl-2">
+                    "{aiSummary.chief_complaint.evidence.exact_text}"
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* History of Present Illness */}
+            {aiSummary.history_of_present_illness && (
+              <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <ClipboardList className="w-4 h-4 text-blue-600" />
+                  <h3 className="font-semibold text-slate-900 text-sm">History of Present Illness</h3>
+                </div>
+                <p className="text-sm text-slate-700 leading-relaxed">{aiSummary.history_of_present_illness.text}</p>
+                {aiSummary.history_of_present_illness.onset && (
+                  <div className="mt-2 flex gap-4 text-xs text-slate-500">
+                    {aiSummary.history_of_present_illness.onset && <span>Onset: {aiSummary.history_of_present_illness.onset}</span>}
+                    {aiSummary.history_of_present_illness.duration && <span>Duration: {aiSummary.history_of_present_illness.duration}</span>}
+                    {aiSummary.history_of_present_illness.severity && <span>Severity: {aiSummary.history_of_present_illness.severity}</span>}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Vitals Summary */}
+            {(chart?.vitalsSummary || aiSummary.vitals) && (
+              <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <Activity className="w-4 h-4 text-red-500" />
+                  <h3 className="font-semibold text-slate-900 text-sm">Vital Signs</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {(chart?.vitalsSummary?.blood_pressure || aiSummary.vitals?.blood_pressure) && (
+                    <div className="flex items-center gap-2 p-2 bg-red-50 rounded-lg">
+                      <Heart className="w-4 h-4 text-red-500" />
+                      <div>
+                        <p className="text-xs text-slate-500">BP</p>
+                        <p className="font-semibold text-slate-900">{chart?.vitalsSummary?.blood_pressure || aiSummary.vitals?.blood_pressure}</p>
+                      </div>
+                    </div>
+                  )}
+                  {(chart?.vitalsSummary?.heart_rate || aiSummary.vitals?.heart_rate) && (
+                    <div className="flex items-center gap-2 p-2 bg-pink-50 rounded-lg">
+                      <Activity className="w-4 h-4 text-pink-500" />
+                      <div>
+                        <p className="text-xs text-slate-500">HR</p>
+                        <p className="font-semibold text-slate-900">{chart?.vitalsSummary?.heart_rate || aiSummary.vitals?.heart_rate}</p>
+                      </div>
+                    </div>
+                  )}
+                  {(chart?.vitalsSummary?.temperature || aiSummary.vitals?.temperature) && (
+                    <div className="flex items-center gap-2 p-2 bg-orange-50 rounded-lg">
+                      <Thermometer className="w-4 h-4 text-orange-500" />
+                      <div>
+                        <p className="text-xs text-slate-500">Temp</p>
+                        <p className="font-semibold text-slate-900">{chart?.vitalsSummary?.temperature || aiSummary.vitals?.temperature}</p>
+                      </div>
+                    </div>
+                  )}
+                  {(chart?.vitalsSummary?.oxygen_saturation || aiSummary.vitals?.oxygen_saturation) && (
+                    <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
+                      <Activity className="w-4 h-4 text-blue-500" />
+                      <div>
+                        <p className="text-xs text-slate-500">SpO2</p>
+                        <p className="font-semibold text-slate-900">{chart?.vitalsSummary?.oxygen_saturation || aiSummary.vitals?.oxygen_saturation}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Physical Examination */}
+            {aiSummary.physical_examination && (
+              <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <Stethoscope className="w-4 h-4 text-indigo-600" />
+                  <h3 className="font-semibold text-slate-900 text-sm">Physical Examination</h3>
+                </div>
+                {typeof aiSummary.physical_examination === 'string' ? (
+                  <p className="text-sm text-slate-700">{aiSummary.physical_examination}</p>
+                ) : (
+                  <div className="space-y-2">
+                    {Object.entries(aiSummary.physical_examination).map(([system, finding]) => (
+                      <div key={system} className="text-sm">
+                        <span className="font-medium text-slate-800 capitalize">{system.replace(/_/g, ' ')}:</span>{' '}
+                        <span className="text-slate-600">{finding}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Assessment & Plan */}
+            {aiSummary.assessment_and_plan && (
+              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl p-4 border border-emerald-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <FileCheck className="w-4 h-4 text-emerald-600" />
+                  <h3 className="font-semibold text-emerald-900 text-sm">Assessment & Plan</h3>
+                </div>
+                {typeof aiSummary.assessment_and_plan === 'string' ? (
+                  <p className="text-sm text-slate-700">{aiSummary.assessment_and_plan}</p>
+                ) : (
+                  <div className="space-y-2">
+                    {aiSummary.assessment_and_plan.assessment && (
+                      <div>
+                        <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">Assessment</p>
+                        <p className="text-sm text-slate-700">{aiSummary.assessment_and_plan.assessment}</p>
+                      </div>
+                    )}
+                    {aiSummary.assessment_and_plan.plan && (
+                      <div className="mt-2">
+                        <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">Plan</p>
+                        <p className="text-sm text-slate-700">{aiSummary.assessment_and_plan.plan}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Timeline of Care */}
             {aiSummary.timeline_of_care?.length > 0 && (
-              <div>
+              <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
                 <div className="flex items-center gap-2 mb-3">
                   <Clock className="w-4 h-4 text-blue-600" />
-                  <h3 className="font-semibold text-slate-900">Visit Timeline</h3>
+                  <h3 className="font-semibold text-slate-900 text-sm">Visit Timeline</h3>
                 </div>
                 <div className="space-y-3">
                   {aiSummary.timeline_of_care.map((event, idx) => (
@@ -1085,8 +1450,8 @@ const ChartDetail = () => {
                         {idx < aiSummary.timeline_of_care.length - 1 && <div className="w-0.5 h-full bg-blue-200 mt-1" />}
                       </div>
                       <div className="flex-1 pb-4">
-                        <p className="font-medium text-slate-900">{event.time && `${event.time} - `}{event.event}</p>
-                        <p className="text-sm text-slate-600">{event.description}</p>
+                        <p className="font-medium text-slate-900 text-sm">{event.time && `${event.time} - `}{event.event}</p>
+                        <p className="text-xs text-slate-600">{event.description}</p>
                       </div>
                     </div>
                   ))}
@@ -1094,18 +1459,43 @@ const ChartDetail = () => {
               </div>
             )}
 
-            {aiSummary.clinical_alerts?.length > 0 && (
-              <div>
+            {/* Medications */}
+            {chart?.medications?.length > 0 && (
+              <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
                 <div className="flex items-center gap-2 mb-3">
-                  <AlertCircle className="w-4 h-4 text-slate-600" />
-                  <h3 className="font-semibold text-slate-900">Clinical Alerts</h3>
+                  <Pill className="w-4 h-4 text-purple-600" />
+                  <h3 className="font-semibold text-slate-900 text-sm">Medications</h3>
+                  <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">{chart.medications.length}</span>
+                </div>
+                <div className="space-y-2">
+                  {chart.medications.slice(0, 5).map((med, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-2 bg-purple-50 rounded-lg">
+                      <div>
+                        <p className="font-medium text-slate-900 text-sm">{med.name}</p>
+                        <p className="text-xs text-slate-500">{med.dose} {med.route} {med.frequency}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {chart.medications.length > 5 && (
+                    <p className="text-xs text-slate-500 text-center">+ {chart.medications.length - 5} more medications</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Clinical Alerts */}
+            {aiSummary.clinical_alerts?.length > 0 && (
+              <div className="bg-red-50 rounded-xl p-4 border border-red-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <AlertTriangle className="w-4 h-4 text-red-600" />
+                  <h3 className="font-semibold text-red-900 text-sm">Clinical Alerts</h3>
                 </div>
                 <div className="space-y-2">
                   {aiSummary.clinical_alerts.map((alert, idx) => (
-                    <div key={idx} className={`p-3 rounded-lg border ${alert.severity === 'high' ? 'bg-red-50 border-red-200' :
-                      alert.severity === 'medium' ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'
+                    <div key={idx} className={`p-3 rounded-lg border ${alert.severity === 'high' ? 'bg-red-100 border-red-300' :
+                      alert.severity === 'medium' ? 'bg-amber-100 border-amber-300' : 'bg-blue-100 border-blue-300'
                       }`}>
-                      <p className={`font-medium ${alert.severity === 'high' ? 'text-red-800' :
+                      <p className={`font-medium text-sm ${alert.severity === 'high' ? 'text-red-800' :
                         alert.severity === 'medium' ? 'text-amber-800' : 'text-blue-800'
                         }`}>{alert.alert}</p>
                     </div>
@@ -1116,47 +1506,34 @@ const ChartDetail = () => {
           </div>
         </div>
 
-        {/* Right Column - Coding Categories */}
+        {/* Right Column - Coding Categories (Reordered) */}
         <div className="flex-1 bg-slate-50 flex flex-col overflow-hidden">
           <div className="p-4 border-b border-slate-200 bg-white">
             <h2 className="font-semibold text-slate-900">AI Coding Assistance</h2>
-            <p className="text-xs text-slate-500">(All codes accepted by default - reject or modify as needed)</p>
+            <p className="text-xs text-slate-500">
+              {isReadOnly ? '(View Only - Chart already submitted)' : '(All codes accepted by default - reject or modify as needed)'}
+            </p>
           </div>
 
           <div className="flex-1 overflow-auto p-4 space-y-6">
-            {/* ED/EM Level */}
-            <CodeSection
-              title="ED/EM Level"
-              category="ed_em_level"
-              codes={workingCodes.ed_em_level}
-              originalCodes={originalAICodes.ed_em_level}
-              onAdd={() => handleAddCode('ed_em_level')}
-              onModify={(idx) => handleCodeModify('ed_em_level', idx, originalAICodes.ed_em_level?.[idx])}
-              onAccept={(idx) => handleCodeAccept('ed_em_level', idx)}
-              onReject={(idx) => handleCodeReject('ed_em_level', idx)}
-              onReset={(idx) => handleCodeReset('ed_em_level', idx)}
-              accentColor="blue"
-              renderCode={(code) => code.code}
-              renderDescription={(code) => code.description}
-            />
+            {/* 1. Reason for Admit */}
+            {/* <CodeSection */}
+            {/*   title="Reason for Admit" */}
+            {/*   category="reason_for_admit" */}
+            {/*   codes={workingCodes.reason_for_admit} */}
+            {/*   originalCodes={originalAICodes.reason_for_admit} */}
+            {/*   onAdd={() => handleAddCode('reason_for_admit')} */}
+            {/*   onModify={(idx) => handleCodeModify('reason_for_admit', idx, originalAICodes.reason_for_admit?.[idx])} */}
+            {/*   onAccept={(idx) => handleCodeAccept('reason_for_admit', idx)} */}
+            {/*   onReject={(idx) => handleCodeReject('reason_for_admit', idx)} */}
+            {/*   onReset={(idx) => handleCodeReset('reason_for_admit', idx)} */}
+            {/*   accentColor="red" */}
+            {/*   renderCode={(code) => code.icd_10_code} */}
+            {/*   renderDescription={(code) => code.description} */}
+            {/*   isReadOnly={isReadOnly} */}
+            {/* /> */}
 
-            {/* Procedures */}
-            <CodeSection
-              title="Procedures"
-              category="procedures"
-              codes={workingCodes.procedures}
-              originalCodes={originalAICodes.procedures}
-              onAdd={() => handleAddCode('procedures')}
-              onModify={(idx) => handleCodeModify('procedures', idx, originalAICodes.procedures?.[idx])}
-              onAccept={(idx) => handleCodeAccept('procedures', idx)}
-              onReject={(idx) => handleCodeReject('procedures', idx)}
-              onReset={(idx) => handleCodeReset('procedures', idx)}
-              accentColor="purple"
-              renderCode={(code) => code.cpt_code}
-              renderDescription={(code) => code.procedure_name || code.description}
-            />
-
-            {/* Primary Diagnosis */}
+            {/* 2. Primary Diagnosis */}
             <CodeSection
               title="Primary Diagnosis"
               category="primary_diagnosis"
@@ -1170,11 +1547,12 @@ const ChartDetail = () => {
               accentColor="emerald"
               renderCode={(code) => code.icd_10_code}
               renderDescription={(code) => code.description}
+              isReadOnly={isReadOnly}
             />
 
-            {/* Secondary Diagnoses */}
+            {/* 3. Secondary Diagnoses */}
             <CodeSection
-              title="Secondary Diagnosis"
+              title="Secondary Diagnoses"
               category="secondary_diagnoses"
               codes={workingCodes.secondary_diagnoses}
               originalCodes={originalAICodes.secondary_diagnoses}
@@ -1186,11 +1564,46 @@ const ChartDetail = () => {
               accentColor="amber"
               renderCode={(code) => code.icd_10_code}
               renderDescription={(code) => code.description}
+              isReadOnly={isReadOnly}
             />
 
-            {/* Modifiers */}
+            {/* 4. Procedures (CPT) */}
             <CodeSection
-              title="Modifier"
+              title="Procedures (CPT)"
+              category="procedures"
+              codes={workingCodes.procedures}
+              originalCodes={originalAICodes.procedures}
+              onAdd={() => handleAddCode('procedures')}
+              onModify={(idx) => handleCodeModify('procedures', idx, originalAICodes.procedures?.[idx])}
+              onAccept={(idx) => handleCodeAccept('procedures', idx)}
+              onReject={(idx) => handleCodeReject('procedures', idx)}
+              onReset={(idx) => handleCodeReset('procedures', idx)}
+              accentColor="purple"
+              renderCode={(code) => code.cpt_code}
+              renderDescription={(code) => code.procedure_name || code.description}
+              isReadOnly={isReadOnly}
+            />
+
+            {/* 5. ED/EM Level */}
+            <CodeSection
+              title="ED/EM Level"
+              category="ed_em_level"
+              codes={workingCodes.ed_em_level}
+              originalCodes={originalAICodes.ed_em_level}
+              onAdd={() => handleAddCode('ed_em_level')}
+              onModify={(idx) => handleCodeModify('ed_em_level', idx, originalAICodes.ed_em_level?.[idx])}
+              onAccept={(idx) => handleCodeAccept('ed_em_level', idx)}
+              onReject={(idx) => handleCodeReject('ed_em_level', idx)}
+              onReset={(idx) => handleCodeReset('ed_em_level', idx)}
+              accentColor="blue"
+              renderCode={(code) => code.code}
+              renderDescription={(code) => code.description}
+              isReadOnly={isReadOnly}
+            />
+
+            {/* 6. Modifiers */}
+            <CodeSection
+              title="Modifiers"
               category="modifiers"
               codes={workingCodes.modifiers}
               originalCodes={originalAICodes.modifiers}
@@ -1202,13 +1615,14 @@ const ChartDetail = () => {
               accentColor="slate"
               renderCode={(code) => code.modifier_code}
               renderDescription={(code) => code.modifier_name}
+              isReadOnly={isReadOnly}
             />
 
             {/* Feedback */}
             <section>
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-1 h-6 bg-red-500 rounded-full"></div>
-                <h3 className="text-lg font-semibold text-slate-900">Feedback</h3>
+                <div className="w-1 h-6 bg-indigo-500 rounded-full"></div>
+                <h3 className="text-lg font-semibold text-slate-900">Coding Feedback</h3>
               </div>
 
               <div className="space-y-4">
@@ -1234,13 +1648,16 @@ const ChartDetail = () => {
 };
 
 // Code Section Component
-const CodeSection = ({ title, category, codes, originalCodes, onAdd, onModify, onAccept, onReject, onReset, accentColor, renderCode, renderDescription }) => {
+const CodeSection = ({ title, category, codes, originalCodes, onAdd, onModify, onAccept, onReject, onReset, accentColor, renderCode, renderDescription, isReadOnly = false }) => {
   const colorClasses = {
     blue: 'bg-blue-500',
     purple: 'bg-purple-500',
     emerald: 'bg-emerald-500',
     amber: 'bg-amber-500',
-    slate: 'bg-slate-500'
+    slate: 'bg-slate-500',
+    red: 'bg-red-500',
+    indigo: 'bg-indigo-500',
+    cyan: 'bg-cyan-500'
   };
 
   const badgeClasses = {
@@ -1248,7 +1665,10 @@ const CodeSection = ({ title, category, codes, originalCodes, onAdd, onModify, o
     purple: 'bg-purple-100 text-purple-700',
     emerald: 'bg-emerald-100 text-emerald-700',
     amber: 'bg-amber-100 text-amber-700',
-    slate: 'bg-slate-200 text-slate-700'
+    slate: 'bg-slate-200 text-slate-700',
+    red: 'bg-red-100 text-red-700',
+    indigo: 'bg-indigo-100 text-indigo-700',
+    cyan: 'bg-cyan-100 text-cyan-700'
   };
 
   const codeArray = Array.isArray(codes) ? codes : [];
@@ -1263,13 +1683,15 @@ const CodeSection = ({ title, category, codes, originalCodes, onAdd, onModify, o
           {codeArray.length > 0 && (
             <span className={`px-2 py-0.5 rounded text-xs ${badgeClasses[accentColor]}`}>{codeArray.length}</span>
           )}
-          {rejectedCount > 0 && (
+          {rejectedCount > 0 && !isReadOnly && (
             <span className="px-2 py-0.5 rounded text-xs bg-red-100 text-red-700">{rejectedCount} rejected</span>
           )}
         </div>
-        <button onClick={onAdd} className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1">
-          <Plus className="w-4 h-4" />Add
-        </button>
+        {!isReadOnly && (
+          <button onClick={onAdd} className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1">
+            <Plus className="w-4 h-4" />Add
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200">
@@ -1287,6 +1709,7 @@ const CodeSection = ({ title, category, codes, originalCodes, onAdd, onModify, o
                 onReject={() => onReject(idx)}
                 onReset={() => onReset(idx)}
                 accentColor={accentColor}
+                isReadOnly={isReadOnly}
               />
             ))}
           </div>
@@ -1301,8 +1724,8 @@ const CodeSection = ({ title, category, codes, originalCodes, onAdd, onModify, o
   );
 };
 
-// Code Row Component - with red border for rejected
-const CodeRow = ({ code, originalCode, renderCode, renderDescription, onModify, onAccept, onReject, onReset, accentColor }) => {
+// Code Row Component - Updated with isReadOnly prop
+const CodeRow = ({ code, originalCode, renderCode, renderDescription, onModify, onAccept, onReject, onReset, accentColor, isReadOnly = false }) => {
   const status = code.status || 'accepted';
   const isModified = code.isModified || status === 'modified';
   const isAdded = code.isUserAdded || status === 'added';
@@ -1321,17 +1744,20 @@ const CodeRow = ({ code, originalCode, renderCode, renderDescription, onModify, 
     purple: 'text-purple-600',
     emerald: 'text-emerald-600',
     amber: 'text-amber-600',
-    slate: 'text-slate-900'
+    slate: 'text-slate-900',
+    red: 'text-red-600',
+    indigo: 'text-indigo-600',
+    cyan: 'text-cyan-600'
   };
 
   return (
     <div className={`p-4 transition-all ${isRejected
-        ? 'bg-red-50 border-l-4 border-red-500'
-        : isModified
-          ? 'bg-blue-50/30 border-l-4 border-blue-400'
-          : isAdded
-            ? 'bg-violet-50/30 border-l-4 border-violet-400'
-            : 'border-l-4 border-transparent'
+      ? 'bg-red-50 border-l-4 border-red-500'
+      : isModified
+        ? 'bg-blue-50/30 border-l-4 border-blue-400'
+        : isAdded
+          ? 'bg-violet-50/30 border-l-4 border-violet-400'
+          : 'border-l-4 border-transparent'
       }`}>
       {/* Show original if modified */}
       {isModified && code.originalCode && (
@@ -1360,50 +1786,67 @@ const CodeRow = ({ code, originalCode, renderCode, renderDescription, onModify, 
           )}
         </div>
 
-        <div className="flex items-center gap-1">
-          <button
-            onClick={onAccept}
-            className={`p-1.5 rounded-lg transition-all ${isAccepted && !isModified && !isAdded
+        {/* Action buttons - hidden when read-only */}
+        {!isReadOnly && (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onAccept}
+              className={`p-1.5 rounded-lg transition-all ${isAccepted && !isModified && !isAdded
                 ? 'bg-emerald-100 text-emerald-600 ring-2 ring-emerald-200'
                 : 'hover:bg-emerald-50 text-slate-400 hover:text-emerald-600'
-              }`}
-            title="Accept"
-          >
-            <Check className="w-4 h-4" />
-          </button>
-          <button
-            onClick={onModify}
-            className={`p-1.5 rounded-lg transition-all ${isModified
+                }`}
+              title="Accept"
+            >
+              <Check className="w-4 h-4" />
+            </button>
+            <button
+              onClick={onModify}
+              className={`p-1.5 rounded-lg transition-all ${isModified
                 ? 'bg-blue-100 text-blue-600 ring-2 ring-blue-200'
                 : 'hover:bg-blue-50 text-slate-400 hover:text-blue-600'
-              }`}
-            title="Modify"
-          >
-            <Edit3 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={onReject}
-            className={`p-1.5 rounded-lg transition-all ${isRejected
+                }`}
+              title="Modify"
+            >
+              <Edit3 className="w-4 h-4" />
+            </button>
+            <button
+              onClick={onReject}
+              className={`p-1.5 rounded-lg transition-all ${isRejected
                 ? 'bg-red-100 text-red-600 ring-2 ring-red-200'
                 : 'hover:bg-red-50 text-slate-400 hover:text-red-600'
-              }`}
-            title="Reject"
-          >
-            <X className="w-4 h-4" />
-          </button>
-          <button
-            onClick={onReset}
-            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-all"
-            title="Reset to Accepted"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
-        </div>
+                }`}
+              title="Reject"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <button
+              onClick={onReset}
+              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-all"
+              title="Reset to Accepted"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
 
       <p className={`text-sm mb-2 ${isRejected ? 'text-red-400 line-through' : 'text-slate-700'}`}>
         {renderDescription(code)}
       </p>
+
+      {/* Show change reason for modified/added codes */}
+      {(isModified || isAdded) && code.changeReason && (
+        <div className="bg-amber-50 rounded-lg p-2.5 mb-2 border border-amber-200">
+          <p className="text-xs text-amber-800">
+            <span className="font-semibold">Reason for {isAdded ? 'Addition' : 'Change'}:</span> {code.changeReason}
+          </p>
+          {code.changeComment && (
+            <p className="text-xs text-amber-700 mt-1">
+              <span className="font-semibold">Comment:</span> {code.changeComment}
+            </p>
+          )}
+        </div>
+      )}
 
       {code.ai_reasoning && !isRejected && (
         <div className="bg-violet-50 rounded-lg p-2.5 mb-2 border border-violet-100">

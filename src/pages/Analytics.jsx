@@ -6,7 +6,7 @@ import {
 import {
   TrendingUp, TrendingDown, BarChart3, Download, ChevronDown,
   CheckCircle2, Target, Edit3, AlertTriangle,
-  Info, CheckCircle, Loader2, Database
+  Info, CheckCircle, Loader2, Database, Brain, X
 } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000/api';
@@ -17,7 +17,8 @@ const COLORS = {
   success: '#10B981',
   warning: '#F59E0B',
   danger: '#EF4444',
-  teal: '#14B8A6'
+  teal: '#14B8A6',
+  violet: '#8B5CF6'
 };
 
 const PIE_COLORS = ['#EF4444', '#F97316', '#FBBF24', '#3B82F6', '#10B981'];
@@ -85,6 +86,7 @@ const Analytics = () => {
 
   const data = analytics;
   const hasData = data && data.summary && data.summary.chartsProcessed > 0;
+  const hasCodeData = data?.summary?.totalAICodes > 0;
 
   // Prepare pie chart data from real data only
   const pieData = data?.correctionReasons?.length > 0
@@ -120,26 +122,30 @@ const Analytics = () => {
           </div>
 
           {/* Export Button */}
-          <button
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-lg shadow-blue-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={!hasData}
-          >
-            <Download className="w-4 h-4" />
-            Export Report
-          </button>
+          {/* <button */}
+          {/*   className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-lg shadow-blue-200 disabled:opacity-50 disabled:cursor-not-allowed" */}
+          {/*   disabled={!hasData} */}
+          {/* > */}
+          {/*   <Download className="w-4 h-4" /> */}
+          {/*   Export Report */}
+          {/* </button> */}
         </div>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-4 gap-4 mb-6">
+        {/* AI Accuracy - Primary Metric (NEW) */}
         <SummaryCard
-          icon={CheckCircle2}
+          icon={Brain}
           iconBg="bg-emerald-100"
           iconColor="text-emerald-600"
-          value={hasData ? `${data.summary.aiAcceptanceRate}%` : '--'}
-          label="AI Acceptance Rate"
-          subLabel={hasData ? `${data.summary.totalSubmitted || 0} charts submitted` : 'No data available'}
-          hasData={hasData}
+          value={hasCodeData ? `${data.summary.aiAccuracy}%` : '--'}
+          label="AI Accuracy"
+          subLabel={hasCodeData
+            ? `${data.summary.unchangedCodes}/${data.summary.totalAICodes} codes unchanged`
+            : 'No submitted data'}
+          hasData={hasCodeData}
+          tooltip="Percentage of AI codes accepted without changes"
         />
         <SummaryCard
           icon={BarChart3}
@@ -154,31 +160,138 @@ const Analytics = () => {
           icon={Target}
           iconBg="bg-amber-100"
           iconColor="text-amber-600"
-          value={hasData ? `${data.summary.overallAccuracy}%` : '--'}
-          label="Overall Accuracy"
-          subLabel="Primary diagnosis accuracy"
+          value={hasData ? `${data.summary.totalSubmitted || 0}` : '0'}
+          label="Charts Submitted"
+          subLabel="Reviewed and submitted"
           hasData={hasData}
         />
         <SummaryCard
           icon={Edit3}
           iconBg="bg-violet-100"
           iconColor="text-violet-600"
-          value={hasData ? `${data.summary.correctionRate}%` : '--'}
+          value={hasCodeData ? `${data.summary.correctionRate}%` : '--'}
           label="Correction Rate"
-          subLabel={hasData ? `${data.summary.totalModifications} codes modified` : 'No data available'}
-          hasData={hasData}
+          subLabel={hasCodeData
+            ? `${data.summary.totalModifications} codes changed`
+            : 'No submitted data'}
+          hasData={hasCodeData}
+          tooltip="Percentage of AI codes that were modified or rejected"
         />
       </div>
 
+      {/* AI Code Breakdown - NEW Section */}
+      {hasCodeData && (
+        <div className="bg-white rounded-xl border border-slate-200 p-5 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Brain className="w-5 h-5 text-emerald-600" />
+              <h3 className="font-semibold text-slate-900">AI Code Analysis</h3>
+            </div>
+            <div className="text-sm text-slate-500">
+              Based on {data.summary.totalSubmitted} submitted charts
+            </div>
+          </div>
+
+          <div className="grid grid-cols-5 gap-4">
+            <CodeStatBox
+              label="Total AI Codes"
+              value={data.summary.totalAICodes}
+              icon={Brain}
+              color="bg-slate-100"
+              textColor="text-slate-700"
+            />
+            <CodeStatBox
+              label="Unchanged"
+              value={data.summary.unchangedCodes}
+              percentage={data.summary.totalAICodes > 0
+                ? ((data.summary.unchangedCodes / data.summary.totalAICodes) * 100).toFixed(1)
+                : 0}
+              icon={CheckCircle}
+              color="bg-emerald-100"
+              textColor="text-emerald-700"
+            />
+            <CodeStatBox
+              label="Modified"
+              value={data.summary.modifiedCodes}
+              percentage={data.summary.totalAICodes > 0
+                ? ((data.summary.modifiedCodes / data.summary.totalAICodes) * 100).toFixed(1)
+                : 0}
+              icon={Edit3}
+              color="bg-blue-100"
+              textColor="text-blue-700"
+            />
+            <CodeStatBox
+              label="Rejected"
+              value={data.summary.rejectedCodes}
+              percentage={data.summary.totalAICodes > 0
+                ? ((data.summary.rejectedCodes / data.summary.totalAICodes) * 100).toFixed(1)
+                : 0}
+              icon={X}
+              color="bg-red-100"
+              textColor="text-red-700"
+            />
+            <CodeStatBox
+              label="User Added"
+              value={data.summary.addedCodes}
+              icon={TrendingUp}
+              color="bg-violet-100"
+              textColor="text-violet-700"
+            />
+          </div>
+
+          {/* Visual Progress Bar */}
+          <div className="mt-4 pt-4 border-t border-slate-100">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-sm text-slate-600">AI Code Outcome Distribution</span>
+            </div>
+            <div className="h-4 rounded-full bg-slate-100 overflow-hidden flex">
+              {data.summary.totalAICodes > 0 && (
+                <>
+                  <div
+                    className="bg-emerald-500 h-full transition-all"
+                    style={{ width: `${(data.summary.unchangedCodes / data.summary.totalAICodes) * 100}%` }}
+                    title={`Unchanged: ${data.summary.unchangedCodes}`}
+                  />
+                  <div
+                    className="bg-blue-500 h-full transition-all"
+                    style={{ width: `${(data.summary.modifiedCodes / data.summary.totalAICodes) * 100}%` }}
+                    title={`Modified: ${data.summary.modifiedCodes}`}
+                  />
+                  <div
+                    className="bg-red-500 h-full transition-all"
+                    style={{ width: `${(data.summary.rejectedCodes / data.summary.totalAICodes) * 100}%` }}
+                    title={`Rejected: ${data.summary.rejectedCodes}`}
+                  />
+                </>
+              )}
+            </div>
+            <div className="flex items-center justify-center gap-6 mt-2 text-xs">
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded bg-emerald-500"></div>
+                <span className="text-slate-600">Unchanged</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded bg-blue-500"></div>
+                <span className="text-slate-600">Modified</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded bg-red-500"></div>
+                <span className="text-slate-600">Rejected</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Charts Row 1 */}
       <div className="grid grid-cols-2 gap-4 mb-6">
-        {/* AI Acceptance Rate Trend */}
+        {/* AI Accuracy Trend */}
         <div className="bg-white rounded-xl border border-slate-200 p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-slate-900">AI Acceptance Rate Trend</h3>
+            <h3 className="font-semibold text-slate-900">AI Accuracy Trend</h3>
             <div className="flex items-center gap-2 text-sm text-slate-500">
-              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-              Acceptance Rate
+              <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+              Accuracy %
             </div>
           </div>
           <div className="h-64">
@@ -186,9 +299,9 @@ const Analytics = () => {
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={data.trends.acceptanceRate}>
                   <defs>
-                    <linearGradient id="acceptanceGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={COLORS.primary} stopOpacity={0.2} />
-                      <stop offset="95%" stopColor={COLORS.primary} stopOpacity={0} />
+                    <linearGradient id="accuracyGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={COLORS.success} stopOpacity={0.2} />
+                      <stop offset="95%" stopColor={COLORS.success} stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
@@ -201,14 +314,14 @@ const Analytics = () => {
                       borderRadius: '8px',
                       boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
                     }}
-                    formatter={(value) => [`${value}%`, 'Acceptance Rate']}
+                    formatter={(value) => [`${value}%`, 'AI Accuracy']}
                   />
                   <Area
                     type="monotone"
-                    dataKey="acceptanceRate"
-                    stroke={COLORS.primary}
+                    dataKey="accuracy"
+                    stroke={COLORS.success}
                     strokeWidth={2}
-                    fill="url(#acceptanceGradient)"
+                    fill="url(#accuracyGradient)"
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -223,7 +336,7 @@ const Analytics = () => {
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-slate-900">Volume by Facility</h3>
             <div className="flex items-center gap-2 text-sm text-slate-500">
-              <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+              <div className="w-3 h-3 rounded-full bg-teal-500"></div>
               Charts Processed
             </div>
           </div>
@@ -260,10 +373,10 @@ const Analytics = () => {
 
       {/* Charts Row 2 */}
       <div className="grid grid-cols-2 gap-4 mb-6">
-        {/* Most Common AI Correction Reasons */}
+        {/* Most Common Correction Reasons */}
         <div className="bg-white rounded-xl border border-slate-200 p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-slate-900">Most Common AI Correction Reasons</h3>
+            <h3 className="font-semibold text-slate-900">Most Common Correction Reasons</h3>
             <button className="text-sm text-blue-600 hover:text-blue-700">View Details</button>
           </div>
           {pieData.length > 0 ? (
@@ -296,7 +409,9 @@ const Analytics = () => {
                         className="w-2.5 h-2.5 rounded-full"
                         style={{ backgroundColor: PIE_COLORS[idx % PIE_COLORS.length] }}
                       />
-                      <span className="text-slate-700">{item.reason}</span>
+                      <span className="text-slate-700 truncate max-w-[180px]" title={item.reason}>
+                        {item.reason}
+                      </span>
                     </div>
                     <span className="font-semibold text-slate-900">{item.percentage}%</span>
                   </div>
@@ -310,21 +425,21 @@ const Analytics = () => {
           )}
         </div>
 
-        {/* Specialty Accuracy Trends */}
+        {/* Accuracy by Specialty */}
         <div className="bg-white rounded-xl border border-slate-200 p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-slate-900">Specialty Accuracy Trends</h3>
+            <h3 className="font-semibold text-slate-900">Accuracy by Specialty</h3>
             <div className="flex items-center gap-2 text-sm text-slate-500">
-              <div className="w-3 h-3 rounded-full bg-red-500"></div>
-              Emergency Dept
+              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+              Accuracy %
             </div>
           </div>
           <div className="h-64">
             {data?.specialtyAccuracy?.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data.specialtyAccuracy}>
+                <BarChart data={data.specialtyAccuracy}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                  <XAxis dataKey="week" tick={{ fontSize: 12 }} stroke="#94A3B8" />
+                  <XAxis dataKey="week" tick={{ fontSize: 11 }} stroke="#94A3B8" />
                   <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} stroke="#94A3B8" />
                   <Tooltip
                     contentStyle={{
@@ -334,14 +449,12 @@ const Analytics = () => {
                     }}
                     formatter={(value) => [`${typeof value === 'number' ? value.toFixed(1) : value}%`, 'Accuracy']}
                   />
-                  <Line
-                    type="monotone"
+                  <Bar
                     dataKey="accuracy"
-                    stroke={COLORS.danger}
-                    strokeWidth={2}
-                    dot={{ fill: COLORS.danger, strokeWidth: 2 }}
+                    fill={COLORS.primary}
+                    radius={[4, 4, 0, 0]}
                   />
-                </LineChart>
+                </BarChart>
               </ResponsiveContainer>
             ) : (
               <EmptyState message="No specialty accuracy data available" />
@@ -352,9 +465,9 @@ const Analytics = () => {
 
       {/* Bottom Row */}
       <div className="grid grid-cols-3 gap-4">
-        {/* Top Correction Categories */}
+        {/* Top Correction Reasons */}
         <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <h3 className="font-semibold text-slate-900 mb-4">Top Correction Categories</h3>
+          <h3 className="font-semibold text-slate-900 mb-4">Top Correction Reasons</h3>
           {data?.correctionReasons?.length > 0 ? (
             <div className="space-y-3">
               {data.correctionReasons.map((item, idx) => (
@@ -364,9 +477,14 @@ const Analytics = () => {
                       className="w-2.5 h-2.5 rounded-full"
                       style={{ backgroundColor: PIE_COLORS[idx % PIE_COLORS.length] }}
                     />
-                    <span className="text-sm text-slate-700">{item.reason}</span>
+                    <span className="text-sm text-slate-700 truncate max-w-[150px]" title={item.reason}>
+                      {item.reason}
+                    </span>
                   </div>
-                  <span className="text-sm font-semibold text-slate-900">{item.percentage}%</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400">({item.count})</span>
+                    <span className="text-sm font-semibold text-slate-900">{item.percentage}%</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -430,19 +548,24 @@ const Analytics = () => {
         </div>
       </div>
 
-      {/* Pagination - shows actual data count */}
-      {hasData && (
+      {/* Footer Info */}
+      {hasCodeData && (
         <div className="flex items-center justify-center mt-6">
-          <div className="flex items-center gap-2 bg-white rounded-full px-4 py-2 shadow-sm border border-slate-200">
-            <button className="p-1 hover:bg-slate-100 rounded-full">
-              <ChevronDown className="w-4 h-4 text-slate-400 rotate-90" />
-            </button>
-            <span className="text-sm text-slate-600 px-3">
-              {data.summary.chartsProcessed} charts in period
-            </span>
-            <button className="p-1 hover:bg-slate-100 rounded-full">
-              <ChevronDown className="w-4 h-4 text-slate-400 -rotate-90" />
-            </button>
+          <div className="flex items-center gap-4 bg-white rounded-full px-6 py-3 shadow-sm border border-slate-200">
+            <div className="flex items-center gap-2 text-sm text-slate-600">
+              <Brain className="w-4 h-4 text-emerald-500" />
+              <span><strong>{data.summary.totalAICodes}</strong> AI codes generated</span>
+            </div>
+            <div className="w-px h-4 bg-slate-200"></div>
+            <div className="flex items-center gap-2 text-sm text-slate-600">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              <span><strong>{data.summary.aiAccuracy}%</strong> accuracy</span>
+            </div>
+            <div className="w-px h-4 bg-slate-200"></div>
+            <div className="flex items-center gap-2 text-sm text-slate-600">
+              <Edit3 className="w-4 h-4 text-blue-500" />
+              <span><strong>{data.summary.totalModifications}</strong> corrections</span>
+            </div>
           </div>
         </div>
       )}
@@ -459,16 +582,38 @@ const EmptyState = ({ message, small = false }) => (
 );
 
 // Summary Card Component
-const SummaryCard = ({ icon: Icon, iconBg, iconColor, value, label, subLabel, hasData }) => (
-  <div className="bg-white rounded-xl border border-slate-200 p-5">
+const SummaryCard = ({ icon: Icon, iconBg, iconColor, value, label, subLabel, hasData, tooltip }) => (
+  <div className="bg-white rounded-xl border border-slate-200 p-5 relative group">
     <div className="flex items-start justify-between mb-3">
       <div className={`p-2.5 rounded-xl ${iconBg}`}>
         <Icon className={`w-5 h-5 ${iconColor}`} />
       </div>
+      {tooltip && (
+        <div className="relative">
+          <Info className="w-4 h-4 text-slate-300 hover:text-slate-500 cursor-help" />
+          <div className="absolute right-0 top-6 w-48 p-2 bg-slate-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+            {tooltip}
+          </div>
+        </div>
+      )}
     </div>
     <div className="text-2xl font-bold text-slate-900 mb-1">{value}</div>
     <div className="text-sm text-slate-600">{label}</div>
     <div className="text-xs text-slate-400 mt-1">{subLabel}</div>
+  </div>
+);
+
+// Code Stat Box Component (NEW)
+const CodeStatBox = ({ label, value, percentage, icon: Icon, color, textColor }) => (
+  <div className={`${color} rounded-xl p-4 text-center`}>
+    <div className="flex items-center justify-center mb-2">
+      <Icon className={`w-5 h-5 ${textColor}`} />
+    </div>
+    <div className={`text-2xl font-bold ${textColor}`}>{value}</div>
+    <div className="text-sm text-slate-600">{label}</div>
+    {percentage !== undefined && (
+      <div className={`text-xs ${textColor} mt-1`}>{percentage}%</div>
+    )}
   </div>
 );
 

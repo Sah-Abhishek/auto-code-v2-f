@@ -2,10 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, Filter, Clock, RefreshCw, ChevronDown, ChevronLeft, ChevronRight,
-  FileText, CheckCircle2, Loader2, AlertTriangle, Bell
+  FileText, CheckCircle2, Loader2, AlertTriangle, Bell, Inbox
 } from 'lucide-react';
 
-const API_BASE_URL = 'http://localhost:4000/api';
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000/api';
 
 const WorkQueue = () => {
   const navigate = useNavigate();
@@ -13,6 +13,7 @@ const WorkQueue = () => {
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, pages: 0 });
   const [stats, setStats] = useState(null);
+  const [queueStats, setQueueStats] = useState(null);
 
   const [filters, setFilters] = useState({
     facility: '',
@@ -69,6 +70,18 @@ const WorkQueue = () => {
     }
   };
 
+  const fetchQueueStats = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/documents/queue/stats`);
+      const data = await response.json();
+      if (data.success) {
+        setQueueStats(data.stats);
+      }
+    } catch (error) {
+      console.error('Error fetching queue stats:', error);
+    }
+  };
+
   const fetchFilterOptions = async () => {
     try {
       const [facilitiesRes, specialtiesRes] = await Promise.all([
@@ -89,12 +102,23 @@ const WorkQueue = () => {
   useEffect(() => {
     fetchCharts();
     fetchStats();
+    fetchQueueStats();
     fetchFilterOptions();
+
+    // Auto-refresh every 10 seconds to show processing updates
+    const interval = setInterval(() => {
+      fetchCharts();
+      fetchStats();
+      fetchQueueStats();
+    }, 10000);
+
+    return () => clearInterval(interval);
   }, [fetchCharts]);
 
   const handleRefresh = () => {
     fetchCharts();
     fetchStats();
+    fetchQueueStats();
   };
 
   const handleFilterChange = (key, value) => {
@@ -108,7 +132,7 @@ const WorkQueue = () => {
 
   const getAIStatusBadge = (status) => {
     const config = {
-      queued: { bg: 'bg-gray-100', text: 'text-gray-600', icon: Clock, label: 'Queued' },
+      queued: { bg: 'bg-slate-100', text: 'text-slate-600', icon: Inbox, label: 'Queued' },
       processing: { bg: 'bg-blue-50', text: 'text-blue-600', icon: Loader2, label: 'Processing', animate: true },
       ready: { bg: 'bg-emerald-50', text: 'text-emerald-600', icon: CheckCircle2, label: 'Ready' },
       failed: { bg: 'bg-red-50', text: 'text-red-600', icon: AlertTriangle, label: 'Failed' }
@@ -178,6 +202,9 @@ const WorkQueue = () => {
     });
   };
 
+  // Calculate total items in queue (queued + processing)
+  const queuedCount = (stats?.queued || 0) + (stats?.processing || 0);
+
   return (
     <div className="p-6 lg:p-8">
       {/* Header */}
@@ -242,6 +269,26 @@ const WorkQueue = () => {
         </div>
       </div>
 
+      {/* Queue Status Banner - shows when items are processing */}
+      {queuedCount > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+              <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+            </div>
+            <div>
+              <p className="font-medium text-blue-900">Processing Documents</p>
+              <p className="text-sm text-blue-700">
+                {stats?.queued || 0} queued, {stats?.processing || 0} processing
+              </p>
+            </div>
+          </div>
+          <div className="text-sm text-blue-600">
+            Auto-refreshing every 10s
+          </div>
+        </div>
+      )}
+
       {/* Search and Stats Bar */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4 mb-6">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -263,6 +310,11 @@ const WorkQueue = () => {
               <span className="text-sm text-slate-600">
                 Queue: <span className="font-semibold text-slate-900">{stats?.total || 0}</span>
               </span>
+              {queuedCount > 0 && (
+                <span className="text-sm text-blue-600">
+                  Processing: <span className="font-semibold">{queuedCount}</span>
+                </span>
+              )}
               <span className="text-sm text-amber-600">
                 Warning: <span className="font-semibold">{stats?.slaWarning || 0}</span>
               </span>
@@ -318,7 +370,13 @@ const WorkQueue = () => {
                 </tr>
               ) : (
                 charts.map((chart) => (
-                  <tr key={chart.id} className="hover:bg-slate-50/50 transition-colors">
+                  <tr
+                    key={chart.id}
+                    className={`hover:bg-slate-50/50 transition-colors ${chart.aiStatus === 'queued' || chart.aiStatus === 'processing'
+                      ? 'bg-blue-50/30'
+                      : ''
+                      }`}
+                  >
                     <td className="px-6 py-4">
                       <span className="text-sm font-semibold text-slate-900">{chart.mrn || 'N/A'}</span>
                     </td>
@@ -346,15 +404,17 @@ const WorkQueue = () => {
                     <td className="px-6 py-4">
                       <button
                         onClick={() => handleOpenChart(chart.chartNumber)}
-                        disabled={chart.aiStatus === 'processing'}
-                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${chart.aiStatus === 'processing'
+                        disabled={chart.aiStatus === 'queued' || chart.aiStatus === 'processing'}
+                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${chart.aiStatus === 'queued' || chart.aiStatus === 'processing'
                           ? 'text-slate-400 bg-slate-100 cursor-not-allowed'
                           : chart.reviewStatus === 'submitted'
                             ? 'text-slate-700 bg-white border border-slate-300 hover:bg-slate-50'
                             : 'text-white bg-blue-600 hover:bg-blue-700'
                           }`}
                       >
-                        {chart.reviewStatus === 'submitted' ? 'View' : 'Open Chart'}
+                        {chart.aiStatus === 'queued' ? 'Queued' :
+                          chart.aiStatus === 'processing' ? 'Processing...' :
+                            chart.reviewStatus === 'submitted' ? 'View' : 'Open Chart'}
                       </button>
                     </td>
                   </tr>
