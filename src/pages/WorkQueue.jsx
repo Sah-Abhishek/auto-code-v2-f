@@ -5,7 +5,8 @@ import {
   FileText, CheckCircle2, Loader2, AlertTriangle, Bell, Inbox
 } from 'lucide-react';
 
-const API_BASE_URL = 'http://localhost:4000/api';
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL ||  'http://localhost:4000/api';
+console.log("This is the base url: ", API_BASE_URL)
 
 const WorkQueue = () => {
   const navigate = useNavigate();
