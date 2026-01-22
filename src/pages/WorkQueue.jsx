@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, Filter, Clock, RefreshCw, ChevronDown, ChevronLeft, ChevronRight,
-  FileText, CheckCircle2, Loader2, AlertTriangle, Bell, Inbox
+  FileText, CheckCircle2, Loader2, AlertTriangle, Bell, Inbox, XCircle, RotateCcw
 } from 'lucide-react';
 
 const API_BASE_URL = 'http://localhost:4000/api';
@@ -19,6 +19,7 @@ const WorkQueue = () => {
     facility: '',
     specialty: '',
     reviewStatus: '',
+    aiStatus: '',
     search: ''
   });
 
@@ -26,10 +27,19 @@ const WorkQueue = () => {
   const [specialties, setSpecialties] = useState([]);
 
   const reviewStatusOptions = [
-    { value: '', label: 'All Statuses' },
+    { value: '', label: 'All Review Statuses' },
     { value: 'pending', label: 'Pending' },
     { value: 'in_review', label: 'In Review' },
     { value: 'submitted', label: 'Submitted' }
+  ];
+
+  const aiStatusOptions = [
+    { value: '', label: 'All AI Statuses' },
+    { value: 'queued', label: 'Queued' },
+    { value: 'processing', label: 'Processing' },
+    { value: 'retry_pending', label: 'Retrying' },
+    { value: 'ready', label: 'Ready' },
+    { value: 'failed', label: 'Failed' }
   ];
 
   const fetchCharts = useCallback(async () => {
@@ -41,6 +51,7 @@ const WorkQueue = () => {
         ...(filters.facility && { facility: filters.facility }),
         ...(filters.specialty && { specialty: filters.specialty }),
         ...(filters.reviewStatus && { reviewStatus: filters.reviewStatus }),
+        ...(filters.aiStatus && { aiStatus: filters.aiStatus }),
         ...(filters.search && { search: filters.search })
       });
 
@@ -130,21 +141,78 @@ const WorkQueue = () => {
     navigate(`/chart/${chartNumber}`);
   };
 
-  const getAIStatusBadge = (status) => {
+  // NEW: Handle retry for failed charts
+  const handleRetryChart = async (chartNumber, e) => {
+    e.stopPropagation();
+    try {
+      const response = await fetch(`${API_BASE_URL}/charts/${chartNumber}/retry`, {
+        method: 'POST'
+      });
+      const data = await response.json();
+      if (data.success) {
+        handleRefresh();
+      } else {
+        alert(`Retry failed: ${data.error}`);
+      }
+    } catch (error) {
+      alert(`Retry failed: ${error.message}`);
+    }
+  };
+
+  const getAIStatusBadge = (status, chart) => {
     const config = {
-      queued: { bg: 'bg-slate-100', text: 'text-slate-600', icon: Inbox, label: 'Queued' },
-      processing: { bg: 'bg-blue-50', text: 'text-blue-600', icon: Loader2, label: 'Processing', animate: true },
-      ready: { bg: 'bg-emerald-50', text: 'text-emerald-600', icon: CheckCircle2, label: 'Ready' },
-      failed: { bg: 'bg-red-50', text: 'text-red-600', icon: AlertTriangle, label: 'Failed' }
+      queued: {
+        bg: 'bg-slate-100',
+        text: 'text-slate-600',
+        icon: Inbox,
+        label: 'Queued'
+      },
+      processing: {
+        bg: 'bg-blue-50',
+        text: 'text-blue-600',
+        icon: Loader2,
+        label: 'Processing',
+        animate: true
+      },
+      retry_pending: {
+        bg: 'bg-amber-50',
+        text: 'text-amber-600',
+        icon: RotateCcw,
+        label: 'Retrying',
+        animate: true
+      },
+      ready: {
+        bg: 'bg-emerald-50',
+        text: 'text-emerald-600',
+        icon: CheckCircle2,
+        label: 'Ready'
+      },
+      failed: {
+        bg: 'bg-red-50',
+        text: 'text-red-600',
+        icon: XCircle,
+        label: 'Failed'
+      }
     };
 
     const { bg, text, icon: Icon, label, animate } = config[status] || config.queued;
 
     return (
-      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${bg} ${text}`}>
-        <Icon className={`w-3.5 h-3.5 ${animate ? 'animate-spin' : ''}`} />
-        {label}
-      </span>
+      <div className="flex flex-col gap-1">
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${bg} ${text}`}>
+          <Icon className={`w-3.5 h-3.5 ${animate ? 'animate-spin' : ''}`} />
+          {label}
+          {chart.retry_count > 0 && status !== 'ready' && (
+            <span className="text-[10px] opacity-75">({chart.retry_count})</span>
+          )}
+        </span>
+        {/* Show error tooltip on hover for failed/retry_pending */}
+        {chart.last_error && (status === 'failed' || status === 'retry_pending') && (
+          <span className="text-[10px] text-red-500 max-w-[150px] truncate" title={chart.last_error}>
+            {chart.last_error.length > 30 ? chart.last_error.substring(0, 30) + '...' : chart.last_error}
+          </span>
+        )}
+      </div>
     );
   };
 
@@ -215,8 +283,9 @@ const WorkQueue = () => {
     });
   };
 
-  // Calculate total items in queue (queued + processing)
-  const queuedCount = (stats?.queued || 0) + (stats?.processing || 0);
+  // Calculate total items in queue (queued + processing + retrying)
+  const queuedCount = (stats?.queued || 0) + (stats?.processing || 0) + (stats?.retry_pending || 0);
+  const failedCount = stats?.failed || 0;
 
   return (
     <div className="p-6 lg:p-8">
@@ -229,7 +298,7 @@ const WorkQueue = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {/* Facility Filter */}
           <div className="relative">
             <select
@@ -256,6 +325,20 @@ const WorkQueue = () => {
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           </div>
 
+          {/* AI Status Filter - NEW */}
+          <div className="relative">
+            <select
+              value={filters.aiStatus}
+              onChange={(e) => handleFilterChange('aiStatus', e.target.value)}
+              className="appearance-none bg-white border border-slate-300 rounded-lg px-4 py-2 pr-10 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+            >
+              {aiStatusOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+          </div>
+
           {/* Review Status Filter */}
           <div className="relative">
             <select
@@ -273,9 +356,9 @@ const WorkQueue = () => {
           {/* Notification */}
           <button className="relative p-2 text-slate-500 hover:bg-slate-100 rounded-lg">
             <Bell className="w-5 h-5" />
-            {stats?.slaCritical > 0 && (
+            {(stats?.slaCritical > 0 || failedCount > 0) && (
               <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center">
-                {stats.slaCritical}
+                {(stats?.slaCritical || 0) + failedCount}
               </span>
             )}
           </button>
@@ -293,12 +376,36 @@ const WorkQueue = () => {
               <p className="font-medium text-blue-900">Processing Documents</p>
               <p className="text-sm text-blue-700">
                 {stats?.queued || 0} queued, {stats?.processing || 0} processing
+                {(stats?.retry_pending || 0) > 0 && `, ${stats.retry_pending} retrying`}
               </p>
             </div>
           </div>
           <div className="text-sm text-blue-600">
             Auto-refreshing every 10s
           </div>
+        </div>
+      )}
+
+      {/* Failed Charts Banner - NEW */}
+      {failedCount > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+              <XCircle className="w-5 h-5 text-red-600" />
+            </div>
+            <div>
+              <p className="font-medium text-red-900">{failedCount} Chart(s) Failed</p>
+              <p className="text-sm text-red-700">
+                These charts could not be processed. Click "Retry" to try again.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => handleFilterChange('aiStatus', 'failed')}
+            className="px-4 py-2 text-sm font-medium text-red-700 bg-white border border-red-300 rounded-lg hover:bg-red-50"
+          >
+            View Failed
+          </button>
         </div>
       )}
 
@@ -321,18 +428,20 @@ const WorkQueue = () => {
           <div className="flex items-center gap-4">
             <div className="hidden lg:flex items-center gap-4 px-4 py-2 bg-slate-50 rounded-lg">
               <span className="text-sm text-slate-600">
-                Queue: <span className="font-semibold text-slate-900">{stats?.total || 0}</span>
+                Total: <span className="font-semibold text-slate-900">{stats?.total || 0}</span>
               </span>
               {queuedCount > 0 && (
                 <span className="text-sm text-blue-600">
                   Processing: <span className="font-semibold">{queuedCount}</span>
                 </span>
               )}
+              {failedCount > 0 && (
+                <span className="text-sm text-red-600">
+                  Failed: <span className="font-semibold">{failedCount}</span>
+                </span>
+              )}
               <span className="text-sm text-amber-600">
                 Warning: <span className="font-semibold">{stats?.slaWarning || 0}</span>
-              </span>
-              <span className="text-sm text-red-600">
-                Critical: <span className="font-semibold">{stats?.slaCritical || 0}</span>
               </span>
             </div>
 
@@ -385,22 +494,24 @@ const WorkQueue = () => {
                 charts.map((chart) => (
                   <tr
                     key={chart.id}
-                    className={`hover:bg-slate-50/50 transition-colors ${chart.aiStatus === 'queued' || chart.aiStatus === 'processing'
+                    className={`hover:bg-slate-50/50 transition-colors ${chart.aiStatus === 'queued' || chart.aiStatus === 'processing' || chart.aiStatus === 'retry_pending'
                         ? 'bg-blue-50/30'
-                        : ''
+                        : chart.aiStatus === 'failed'
+                          ? 'bg-red-50/30'
+                          : ''
                       }`}
                   >
                     <td className="px-6 py-4">
                       <span className="text-sm font-semibold text-slate-900">{chart.mrn || 'N/A'}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm text-slate-600">{chart.chartNumber}</span>
+                      <span className="text-sm text-slate-600">{chart.chartNumber || chart.chart_number}</span>
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm text-slate-600">{chart.facility || 'N/A'}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm text-slate-600">{formatDate(chart.dateOfService)}</span>
+                      <span className="text-sm text-slate-600">{formatDate(chart.dateOfService || chart.date_of_service)}</span>
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm text-slate-600">{chart.specialty || 'N/A'}</span>
@@ -408,27 +519,37 @@ const WorkQueue = () => {
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center gap-1.5 text-sm text-slate-600">
                         <FileText className="w-4 h-4" />
-                        {chart.documentCount || 0} {chart.documentCount === 1 ? 'doc' : 'docs'}
+                        {chart.documentCount || chart.document_count || 0} {(chart.documentCount || chart.document_count) === 1 ? 'doc' : 'docs'}
                       </span>
                     </td>
-                    <td className="px-6 py-4">{getAIStatusBadge(chart.aiStatus)}</td>
-                    <td className="px-6 py-4">{getReviewStatusBadge(chart.reviewStatus)}</td>
+                    <td className="px-6 py-4">{getAIStatusBadge(chart.aiStatus || chart.ai_status, chart)}</td>
+                    <td className="px-6 py-4">{getReviewStatusBadge(chart.reviewStatus || chart.review_status)}</td>
                     <td className="px-6 py-4">{getSLABadge(chart.sla)}</td>
                     <td className="px-6 py-4">
-                      <button
-                        onClick={() => handleOpenChart(chart.chartNumber)}
-                        disabled={chart.aiStatus === 'queued' || chart.aiStatus === 'processing'}
-                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${chart.aiStatus === 'queued' || chart.aiStatus === 'processing'
-                            ? 'text-slate-400 bg-slate-100 cursor-not-allowed'
-                            : chart.reviewStatus === 'submitted'
-                              ? 'text-slate-700 bg-white border border-slate-300 hover:bg-slate-50'
-                              : 'text-white bg-blue-600 hover:bg-blue-700'
-                          }`}
-                      >
-                        {chart.aiStatus === 'queued' ? 'Queued' :
-                          chart.aiStatus === 'processing' ? 'Processing...' :
-                            chart.reviewStatus === 'submitted' ? 'View' : 'Open Chart'}
-                      </button>
+                      {(chart.aiStatus || chart.ai_status) === 'failed' ? (
+                        <button
+                          onClick={(e) => handleRetryChart(chart.chartNumber || chart.chart_number, e)}
+                          className="px-4 py-2 text-sm font-medium rounded-lg transition-colors text-amber-700 bg-amber-100 hover:bg-amber-200 border border-amber-300"
+                        >
+                          Retry
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleOpenChart(chart.chartNumber || chart.chart_number)}
+                          disabled={['queued', 'processing', 'retry_pending'].includes(chart.aiStatus || chart.ai_status)}
+                          className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${['queued', 'processing', 'retry_pending'].includes(chart.aiStatus || chart.ai_status)
+                              ? 'text-slate-400 bg-slate-100 cursor-not-allowed'
+                              : (chart.reviewStatus || chart.review_status) === 'submitted'
+                                ? 'text-slate-700 bg-white border border-slate-300 hover:bg-slate-50'
+                                : 'text-white bg-blue-600 hover:bg-blue-700'
+                            }`}
+                        >
+                          {(chart.aiStatus || chart.ai_status) === 'queued' ? 'Queued' :
+                            (chart.aiStatus || chart.ai_status) === 'processing' ? 'Processing...' :
+                              (chart.aiStatus || chart.ai_status) === 'retry_pending' ? 'Retrying...' :
+                                (chart.reviewStatus || chart.review_status) === 'submitted' ? 'View' : 'Open Chart'}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
