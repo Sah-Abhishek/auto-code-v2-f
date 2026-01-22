@@ -5,7 +5,7 @@ import {
   FileText, CheckCircle2, Loader2, AlertTriangle, Bell, Inbox, XCircle, RotateCcw
 } from 'lucide-react';
 
-const API_BASE_URL = 'http://localhost:4000/api';
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000/api';
 
 const WorkQueue = () => {
   const navigate = useNavigate();
@@ -495,10 +495,10 @@ const WorkQueue = () => {
                   <tr
                     key={chart.id}
                     className={`hover:bg-slate-50/50 transition-colors ${chart.aiStatus === 'queued' || chart.aiStatus === 'processing' || chart.aiStatus === 'retry_pending'
-                        ? 'bg-blue-50/30'
-                        : chart.aiStatus === 'failed'
-                          ? 'bg-red-50/30'
-                          : ''
+                      ? 'bg-blue-50/30'
+                      : chart.aiStatus === 'failed'
+                        ? 'bg-red-50/30'
+                        : ''
                       }`}
                   >
                     <td className="px-6 py-4">
@@ -538,10 +538,10 @@ const WorkQueue = () => {
                           onClick={() => handleOpenChart(chart.chartNumber || chart.chart_number)}
                           disabled={['queued', 'processing', 'retry_pending'].includes(chart.aiStatus || chart.ai_status)}
                           className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${['queued', 'processing', 'retry_pending'].includes(chart.aiStatus || chart.ai_status)
-                              ? 'text-slate-400 bg-slate-100 cursor-not-allowed'
-                              : (chart.reviewStatus || chart.review_status) === 'submitted'
-                                ? 'text-slate-700 bg-white border border-slate-300 hover:bg-slate-50'
-                                : 'text-white bg-blue-600 hover:bg-blue-700'
+                            ? 'text-slate-400 bg-slate-100 cursor-not-allowed'
+                            : (chart.reviewStatus || chart.review_status) === 'submitted'
+                              ? 'text-slate-700 bg-white border border-slate-300 hover:bg-slate-50'
+                              : 'text-white bg-blue-600 hover:bg-blue-700'
                             }`}
                         >
                           {(chart.aiStatus || chart.ai_status) === 'queued' ? 'Queued' :
