@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FileText, Image, ClipboardPaste, ChevronDown, Send, X, Plus,
-  Stethoscope, FlaskConical, ScanLine, ClipboardCheck, FileImage, File,
+  Stethoscope, FlaskConical, ScanLine, ClipboardCheck, FileImage, File as FileIcon,
   Loader2, CheckCircle2, AlertCircle, Layers, Trash2
 } from 'lucide-react';
 
@@ -293,9 +293,21 @@ const DocumentIngestion = () => {
       }
     });
 
+    // Add text entries - convert to text files
+    docUploads.texts.forEach((textEntry, idx) => {
+      const textBlob = new Blob([textEntry.content], { type: 'text/plain' });
+      const textFile = new File([textBlob], `clinical-text-${idx + 1}.txt`, { type: 'text/plain' });
+      files.push(textFile);
+      transactions.push({
+        type: 'text',
+        fileIndex: fileIndex,
+        label: `Clinical Text ${idx + 1}`
+      });
+      fileIndex++;
+    });
+
     return { files, transactions };
   };
-
   const handleSubmit = async () => {
     if (!formData.chartNumber.trim()) {
       setSubmitResult({ success: false, message: 'Chart Number is required.' });
@@ -421,7 +433,7 @@ const DocumentIngestion = () => {
   const currentTab = tabs.find(t => t.id === activeTab);
   const totalFilesCount = Object.values(uploads).reduce((acc, u) => {
     const imageCount = u.imageGroups.reduce((a, g) => a + g.images.length, 0);
-    return acc + u.pdfs.length + imageCount;
+    return acc + u.pdfs.length + imageCount + u.texts.length;
   }, 0);
   const totalTransactionsCount = getTotalTransactions();
 
@@ -514,7 +526,7 @@ const DocumentIngestion = () => {
                   onDrop={(e) => handleDrop(e, 'pdfs')}
                 >
                   <input type="file" accept=".pdf" multiple onChange={(e) => handleFileInput(e, 'pdfs')} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                  <File className="w-8 h-8 text-red-300 mx-auto mb-2" />
+                  <FileIcon className="w-8 h-8 text-red-300 mx-auto mb-2" />
                   <p className="text-sm text-slate-600 font-medium">Drop PDFs here</p>
                   <p className="text-xs text-slate-400 mt-1">or click to browse</p>
                 </div>
