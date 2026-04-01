@@ -38,7 +38,7 @@ const DocumentIngestion = () => {
   const [submitResult, setSubmitResult] = useState(null);
 
   const tabs = [
-    { id: 'ed-notes', label: 'ED Notes', icon: Stethoscope, color: 'blue' },
+    { id: 'ed-notes', label: 'Medical Documents', icon: Stethoscope, color: 'blue' },
     { id: 'labs', label: 'Labs', icon: FlaskConical, color: 'emerald' },
     { id: 'radiology', label: 'Radiology', icon: ScanLine, color: 'violet' },
     { id: 'discharge', label: 'Discharge', icon: ClipboardCheck, color: 'amber' }
